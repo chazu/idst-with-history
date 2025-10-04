@@ -1,30 +1,38 @@
 IDST   = @IDST@
-CFLAGS = @CFLAGS@ @MFLAGS@ -g @O3FLAGS@ -I$(BIN)/include -DNDEBUG -DSYSARCH=\"@SYSARCH@\" -DSYSOS=\"@SYSOS@\" $(EFLAGS) -fno-strict-aliasing
-PFLAGS = @CFLAGS@ @MFLAGS@ -g @PGFLAGS@ -I$(BIN)/include -DNDEBUG -DSYSARCH=\"@SYSARCH@\" -DSYSOS=\"@SYSOS@\" $(EFLAGS) -fno-strict-aliasing
-GFLAGS = @CFLAGS@ @MFLAGS@ -g           -I$(BIN)/include -DNDEBUG -DSYSARCH=\"@SYSARCH@\" -DSYSOS=\"@SYSOS@\" $(EFLAGS) -fno-strict-aliasing
+CFLAGS = @CFLAGS@ @MFLAGS@ -g @O3FLAGS@ -I$(BIN)/include -DNDEBUG -DSYSARCH=\"@SYSARCH@\" -DSYSOS=\"@SYSOS@\" @SYSTEM_GC_CFLAGS@ $(EFLAGS) -fno-strict-aliasing
+PFLAGS = @CFLAGS@ @MFLAGS@ -g @PGFLAGS@ -I$(BIN)/include -DNDEBUG -DSYSARCH=\"@SYSARCH@\" -DSYSOS=\"@SYSOS@\" @SYSTEM_GC_CFLAGS@ $(EFLAGS) -fno-strict-aliasing
+GFLAGS = @CFLAGS@ @MFLAGS@ -g           -I$(BIN)/include -DNDEBUG -DSYSARCH=\"@SYSARCH@\" -DSYSOS=\"@SYSOS@\" @SYSTEM_GC_CFLAGS@ $(EFLAGS) -fno-strict-aliasing
 PREFIX = @PREFIX@
 GCDIR  = @GCDIR@
+SYSTEM_GC_LDFLAGS = @SYSTEM_GC_LDFLAGS@
 
 LIBID_K_O = @LIBID_K_O@
 CCFLAGS_K = @CCFLAGS_K@ -I$(BIN)/include -DNDEBUG -DSYSARCH=\"@SYSARCH@\" -DSYSOS=\"@SYSOS@\" -I$(IDST)/system/include
 
 all : $(BIN)./include $(BIN)libid.o $(BIN)libid_p.o $(BIN)libid_g.o $(BIN)$(LIBID_K_O)
 
-$(BIN)./include : 
+$(BIN)./include :
 	-$(SHELL) -ec 'mkdir $(BIN)./include; \
-		mkdir $(BIN)./include/id;  cp -pr ../id/*.h $(BIN)./include/id; \
-		cp -pr ../$(GCDIR)/include $(BIN)./include/gc;  find $(BIN)./include/gc -name .svn -exec rm -rf {} \;'
+		mkdir $(BIN)./include/id;  cp -pr *.h $(BIN)./include/id; \
+		if [ "$(GCDIR)" = "system" ]; then \
+			mkdir -p $(BIN)./include/gc; \
+			cp -pr /opt/homebrew/include/gc.h $(BIN)./include/gc/; \
+			cp -pr /opt/homebrew/Cellar/bdw-gc/*/include/gc $(BIN)./include/gc/; \
+		else \
+			cp -pr ../$(GCDIR)/include $(BIN)./include/gc; \
+		fi; \
+		find $(BIN)./include/gc -name .svn -exec rm -rf {} \;'
 
-$(BIN)libid.o : libid.c $(BIN)./include
+$(BIN)libid.o : libid_enhanced.c $(BIN)./include
 	$(CC) $(CFLAGS) -DPREFIX='"@PREFIX@"' $< -c -o $@
 
-$(BIN)libid_p.o : libid.c $(BIN)./include
+$(BIN)libid_p.o : libid_enhanced.c $(BIN)./include
 	$(CC) $(PFLAGS) -pg -DPREFIX='"@PREFIX@"' $< -c -o $@
 
-$(BIN)libid_g.o : libid.c $(BIN)./include
+$(BIN)libid_g.o : libid_enhanced.c $(BIN)./include
 	$(CC) $(GFLAGS) -g -DPREFIX='"@PREFIX@"' $< -c -o $@
 
-$(BIN)libid_k.o : libid.c $(BIN)./include
+$(BIN)libid_k.o : libid_enhanced.c $(BIN)./include
 	$(CC) $(CCFLAGS_K) -DPREFIX='"@PREFIX@"' $< -c -o $@
 
 

@@ -98,6 +98,13 @@ arm () {
      SYSARCH="arm"
 }
 
+arm64 () {
+     OFLAGS=${OFLAGS:-"-O"}
+     O3FLAGS=${O3FLAGS:-"-O3 -fomit-frame-pointer -funroll-loops"}
+     PGFLAGS=${PGFLAGS:-"-O3 -funroll-loops"}
+     SYSARCH="arm64"
+}
+
 ia64 () {
     OFLAGS=${OFLAGS:-"-O"}
     O3FLAGS=${O3FLAGS:-"-O"}
@@ -138,6 +145,12 @@ arch_386 () {
 
 gc7 () {
     GCDIR="gc-7.0"
+}
+
+system_gc () {
+    GCDIR="system"
+    SYSTEM_GC_CFLAGS="-I/opt/homebrew/include"
+    SYSTEM_GC_LDFLAGS="-L/opt/homebrew/lib -lgc"
 }
 
 darwin () {
@@ -221,6 +234,7 @@ case $TARGET in
     powerpc-*-darwin*)		ppc;	darwin;	arch_ppc	;;
     powerpc-*-netbsd*)		ppc;	bsd;	pic		;;
     powerpc-*-linux-gnu)	ppc;	linux			;;
+    arm-*-darwin*)		arm64;	darwin;	system_gc	;;
     arm*-*-linux-gnu)		arm;	linux			;;
     ia64-*-linux-gnu)		ia64;	linux			;;
     i[3456789]86-*-darwin9*)	i386;	darwin; arch_386; gc7	;;
@@ -272,6 +286,8 @@ echo "  LIBID_K_O  = $LIBID_K_O"
 echo "  CCFLAGS_K  = $CCFLAGS_K"
 echo "  LDFLAGS_K  = $LDFLAGS_K"
 echo "  GCDIR      = $GCDIR"
+echo "  SYSTEM_GC_CFLAGS = $SYSTEM_GC_CFLAGS"
+echo "  SYSTEM_GC_LDFLAGS = $SYSTEM_GC_LDFLAGS"
 echo "  SYSARCH    = $SYSARCH"
 echo "  SYSOS      = $SYSOS"
 
@@ -304,6 +320,8 @@ s:@OBJEXT@:$OBJEXT:g;
 s:@OBJEXT_O@:$OBJEXT_O:g;
 s:@OBJEXT_SO@:$OBJEXT_SO:g;
 s:@GCDIR@:$GCDIR:g;
+s:@SYSTEM_GC_CFLAGS@:$SYSTEM_GC_CFLAGS:g;
+s:@SYSTEM_GC_LDFLAGS@:$SYSTEM_GC_LDFLAGS:g;
 s:@SYSARCH@:$SYSARCH:g;
 s:@SYSOS@:$SYSOS:g;
 " < $file.in > $file

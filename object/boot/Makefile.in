@@ -108,15 +108,17 @@ OBJEXT		= @OBJEXT@
 OBJEXT_O	= @OBJEXT_O@
 OBJEXT_SO	= @OBJEXT_SO@
 GCDIR		= @GCDIR@
+SYSTEM_GC_CFLAGS = @SYSTEM_GC_CFLAGS@
+SYSTEM_GC_LDFLAGS = @SYSTEM_GC_LDFLAGS@
 SYSOS		= @SYSOS@
 
 all : $(FILES)
 
 libid.o : src/libid.c include/gc gc.a
-	$(CC) -Iinclude -DPREFIX='"$(PREFIX)"' $(CFLAGS) $(O3FLAGS) $(CCFLAGS_O) $(LDFLAGS_O) $< $(LDLIBS_O) -o $@
+	$(CC) -Iinclude $(SYSTEM_GC_CFLAGS) -DPREFIX='"$(PREFIX)"' $(CFLAGS) $(O3FLAGS) $(CCFLAGS_O) $(LDFLAGS_O) $< $(LDLIBS_O) $(SYSTEM_GC_LDFLAGS) -o $@
 
 libid_g.o : src/libid.c include/gc gc.a
-	$(CC) -Iinclude -DPREFIX='"$(PREFIX)"' $(CFLAGS) $(GFLAGS) $(CCFLAGS_O) $(LDFLAGS_O) $< $(LDLIBS_O) -o $@
+	$(CC) -Iinclude $(SYSTEM_GC_CFLAGS) -DPREFIX='"$(PREFIX)"' $(CFLAGS) $(GFLAGS) $(CCFLAGS_O) $(LDFLAGS_O) $< $(LDLIBS_O) $(SYSTEM_GC_LDFLAGS) -o $@
 
 idc : ../idc/idc gc.a
 	cp -p $< .
@@ -124,23 +126,34 @@ idc : ../idc/idc gc.a
 .SUFFIXES :
 
 st80$(OBJEXT_SO) : src/st80$(OBJEXT_SO).c $(ST80_FILES) include/gc gc.a
-	$(CC) -Iinclude $(CFLAGS) $(OFLAGS) $(CCFLAGS_SO) $(LDFLAGS_SO) $< $(ST80_FILES) $(LDLIBS_SO) -o $@
+	$(CC) -Iinclude $(SYSTEM_GC_CFLAGS) $(CFLAGS) $(OFLAGS) $(CCFLAGS_SO) $(LDFLAGS_SO) $< $(ST80_FILES) $(LDLIBS_SO) $(SYSTEM_GC_LDFLAGS) -o $@
 
 idst$(OBJEXT_SO) : src/idst$(OBJEXT_SO).c $(IDST_FILES) include/gc gc.a
-	$(CC) -Iinclude $(CFLAGS) $(OFLAGS) $(CCFLAGS_SO) $(LDFLAGS_SO) $< $(IDST_FILES) $(LDLIBS_SO) -o $@
+	$(CC) -Iinclude $(SYSTEM_GC_CFLAGS) $(CFLAGS) $(OFLAGS) $(CCFLAGS_SO) $(LDFLAGS_SO) $< $(IDST_FILES) $(LDLIBS_SO) $(SYSTEM_GC_LDFLAGS) -o $@
 
 %$(OBJEXT_O) : src/%$(OBJEXT_O).c include/gc gc.a
-	$(CC) -Iinclude $(CFLAGS) $(OFLAGS) $(CCFLAGS_O) $(LDFLAGS_O) $< $(LDLIBS_O) -o $@
+	$(CC) -Iinclude $(SYSTEM_GC_CFLAGS) $(CFLAGS) $(OFLAGS) $(CCFLAGS_O) $(LDFLAGS_O) $< $(LDLIBS_O) $(SYSTEM_GC_LDFLAGS) -o $@
 
 %$(OBJEXT) : src/%.c gc.a libid.o libid_g.o include/gc
-	$(CC) -Iinclude $(CFLAGS) $(OFLAGS) $(CCFLAGS) $(LDFLAGS) $< $(LDLIBS) -o $@ libid.o gc.a -lm
+	$(CC) -Iinclude $(SYSTEM_GC_CFLAGS) $(CFLAGS) $(OFLAGS) $(CCFLAGS) $(LDFLAGS) $< $(LDLIBS) $(SYSTEM_GC_LDFLAGS) -o $@ libid.o gc.a -lm
 
 include/gc :
+ifeq ($(GCDIR),system)
+	rm -rf include/gc
+	mkdir -p include/gc
+	cp -pr /opt/homebrew/include/gc.h include/gc/
+	cp -pr /opt/homebrew/Cellar/bdw-gc/*/include/gc include/gc/
+else
 	rm -rf include/gc
 	cp -pr ../$(GCDIR)/include include/gc
+endif
 
-gc.a : ../$(GCDIR)/.libs/libgc.a
+gc.a :
+ifeq ($(GCDIR),system)
+	-$(SHELL) -ec 'ln -s /opt/homebrew/lib/libgc.a ./gc.a'
+else
 	-$(SHELL) -ec 'ln -s ../$(GCDIR)/.libs/libgc.a ./gc.a'
+endif
 
 ../$(GCDIR)/.libs/libgc.a :
 ifeq ($(SYSOS),win32)

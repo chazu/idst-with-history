@@ -53,7 +53,7 @@
 #define PACKAGE_VERSION "1.2"
 
 /* Define to 1 if you have the ANSI C header files. */
-#define STDC_HEADERS 1
+/* #undef STDC_HEADERS */
 
 /* Version number of package */
 #define VERSION "1.2"
