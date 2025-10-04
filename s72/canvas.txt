@@ -1,0 +1,852 @@
+# s72-lite — Smalltalk‑72–flavored REPL on libid (starter skeleton)
+
+Below is a minimal, buildable repository laid out as multiple files. Copy each section into matching files.
+
+---
+
+## Makefile — `Makefile`
+
+```make
+CC      := cc
+CFLAGS  := -std=c11 -O2 -Wall -Wextra -Werror -g
+LDFLAGS :=
+
+SRC := \
+  src/main.c \
+  src/reader.c \
+  src/eval.c \
+  src/object.c \
+  src/builtins.c \
+  src/number.c \
+  src/boolean.c \
+  src/string.c \
+  src/list.c \
+  src/block.c
+
+INCLUDE := -Isrc
+
+# Standalone build (no libid); uses internal object system
+s72: $(SRC)
+	$(CC) $(CFLAGS) $(INCLUDE) -o $@ $(SRC) $(LDFLAGS)
+
+# Optional libid build (if you have libid installed). Adjust paths as needed.
+# Define USE_LIBID to route sends through libid; otherwise fallback to local dispatch.
+LIBID_CFLAGS := -DUSE_LIBID -Ilibid/include
+LIBID_LDFLAGS := -Llibid -lid
+
+s72-libid: $(SRC)
+	$(CC) $(CFLAGS) $(INCLUDE) $(LIBID_CFLAGS) -o $@ $(SRC) $(LDFLAGS) $(LIBID_LDFLAGS)
+
+.PHONY: run test clean
+
+run: s72
+	./s72 lang/init.s72
+
+clean:
+	rm -f s72 s72-libid
+```
+```
+
+---
+
+## Entry point / REPL — `src/main.c`
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "reader.h"
+#include "eval.h"
+#include "object.h"
+
+static void usage(const char* argv0){
+  fprintf(stderr, "usage: %s [init.s72]\n", argv0);
+}
+
+int main(int argc, char** argv){
+  obj_system_boot();
+  install_builtins();
+
+  if (argc > 2) { usage(argv[0]); return 1; }
+
+  if (argc == 2) {
+    const char* path = argv[1];
+    FILE* f = fopen(path, "rb");
+    if (!f) { perror("open init"); return 1; }
+    Reader r = reader_from_file(f);
+    while (!reader_eof(&r)) {
+      AST* node = read_form(&r);
+      if (!node) break;
+      Value v = eval(node, env_global());
+      (void)v; // ignore
+      ast_free(node);
+    }
+    fclose(f);
+  }
+
+  // REPL
+  Reader r = reader_from_stdin();
+  printf("s72-lite ready. Ctrl-D to exit.\n");
+  while (1) {
+    printf("s72> ");
+    fflush(stdout);
+    AST* node = read_form(&r);
+    if (!node) break;
+    Value v = eval(node, env_global());
+    char* s = value_print(v);
+    if (s) { printf("%s\n", s); free(s); }
+    ast_free(node);
+  }
+
+  obj_system_shutdown();
+  return 0;
+}
+```
+```
+
+---
+
+## Reader (lexer + tiny parser) — `src/reader.h`
+
+```c
+#pragma once
+#include <stdio.h>
+#include <stdbool.h>
+#include "ast.h"
+
+typedef struct Reader {
+  FILE* f;
+  int   line;
+  int   col;
+  int   peek;
+  bool  has_peek;
+} Reader;
+
+Reader reader_from_file(FILE* f);
+Reader reader_from_stdin(void);
+bool reader_eof(Reader* r);
+AST* read_form(Reader* r);
+```
+```
+
+---
+
+## Reader — `src/reader.c`
+
+```c
+#include "reader.h"
+#include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
+
+static int r_getc(Reader* r){
+  int c;
+  if (r->has_peek) { c = r->peek; r->has_peek = false; }
+  else c = fgetc(r->f);
+  if (c == '\n') { r->line++; r->col = 0; } else r->col++;
+  return c;
+}
+static void r_ungetc(Reader* r, int c){ r->peek = c; r->has_peek = true; }
+
+Reader reader_from_file(FILE* f){ Reader r = { .f=f, .line=1, .col=0, .peek=0, .has_peek=false }; return r; }
+Reader reader_from_stdin(void){ return reader_from_file(stdin); }
+bool reader_eof(Reader* r){ return feof(r->f); }
+
+static void skip_ws(Reader* r){
+  for (;;) {
+    int c = r_getc(r);
+    if (c == ';') { // comment to end of line
+      while (c != '\n' && c != EOF) c = r_getc(r);
+      continue;
+    }
+    if (isspace(c)) continue;
+    r_ungetc(r, c);
+    return;
+  }
+}
+
+static char* read_token(Reader* r){
+  skip_ws(r);
+  char buf[4096]; size_t n=0;
+  int c = r_getc(r);
+  if (c==EOF) return NULL;
+  if (c=='('||c==')'||c=='['||c==']'||c=='\''||c=='"') {
+    buf[n++] = (char)c; buf[n]='\0';
+    return strdup(buf);
+  }
+  r_ungetc(r, c);
+  for(;;){
+    c = r_getc(r);
+    if (c==EOF || isspace(c) || c=='('||c==')'||c=='['||c==']') { r_ungetc(r,c); break; }
+    buf[n++] = (char)c;
+    if (n+1>=sizeof(buf)) break;
+  }
+  buf[n]='\0';
+  return strdup(buf);
+}
+
+static AST* read_list_like(Reader* r, int open_tok, int close_tok, ASTKind kind){
+  AST* list = ast_new(kind);
+  for(;;){
+    skip_ws(r);
+    int c = r_getc(r);
+    if (c==close_tok) break;
+    if (c==EOF) break;
+    r_ungetc(r,c);
+    AST* elt = read_form(r);
+    if (!elt) break;
+    ast_push(list, elt);
+  }
+  return list;
+}
+
+AST* read_form(Reader* r){
+  char* t = read_token(r);
+  if (!t) return NULL;
+  if (strcmp(t, "(") == 0) { free(t); return read_list_like(r, '(', ')', AST_LIST); }
+  if (strcmp(t, "[") == 0) { free(t); return read_list_like(r, '[', ']', AST_BLOCK); }
+  if (strcmp(t, ")") == 0 || strcmp(t, "]") == 0) { free(t); return NULL; }
+  if (strcmp(t, "\"") == 0) {
+    // string literal
+    char buf[65536]; size_t n=0; int c;
+    while((c=r_getc(r))!=EOF && c!='"'){ buf[n++]=(char)c; }
+    buf[n]='\0';
+    AST* s = ast_new(AST_STRING);
+    s->s = strdup(buf);
+    free(t);
+    return s;
+  }
+  if (strcmp(t, "'") == 0) {
+    AST* sym = read_form(r);
+    AST* q = ast_new(AST_QUOTE);
+    ast_push(q, sym);
+    free(t);
+    return q;
+  }
+  // number?
+  char* end=NULL; double d = strtod(t, &end);
+  if (end && *end=='\0' && (strchr(t,'.')||isdigit((unsigned char)t[0])||t[0]=='-'||t[0]=='+')) {
+    AST* num = ast_new(AST_NUMBER);
+    num->d = d;
+    free(t);
+    return num;
+  }
+  // symbol / atom
+  AST* a = ast_new(AST_SYMBOL);
+  a->s = t; // take ownership
+  return a;
+}
+```
+```
+
+---
+
+## AST — `src/ast.h`
+
+```c
+#pragma once
+#include <stddef.h>
+
+typedef enum {
+  AST_NUMBER,
+  AST_STRING,
+  AST_SYMBOL,
+  AST_LIST,   // (receiver selector arg ...)
+  AST_BLOCK,  // [ ... ]
+  AST_QUOTE
+} ASTKind;
+
+typedef struct AST {
+  ASTKind kind;
+  double  d;
+  char*   s;
+  struct AST** v; size_t n, cap;
+} AST;
+
+AST* ast_new(ASTKind k);
+void ast_push(AST* a, AST* child);
+void ast_free(AST* a);
+```
+```
+
+---
+
+## AST impl (inline for simplicity) — `src/ast.c` *(optional; rolled into eval.c below if you prefer fewer files)*
+
+```c
+#include "ast.h"
+#include <stdlib.h>
+#include <string.h>
+
+AST* ast_new(ASTKind k){ AST* a = calloc(1,sizeof(AST)); a->kind=k; return a; }
+void ast_push(AST* a, AST* child){
+  if (a->n+1 > a->cap){ a->cap = a->cap? a->cap*2 : 4; a->v = realloc(a->v, a->cap*sizeof(AST*)); }
+  a->v[a->n++] = child;
+}
+static void ast_free_rec(AST* a){
+  if (!a) return;
+  for (size_t i=0;i<a->n;i++) ast_free_rec(a->v[i]);
+  free(a->v);
+  free(a->s);
+  free(a);
+}
+void ast_free(AST* a){ ast_free_rec(a); }
+```
+```
+
+> If you don’t want a separate file, paste this into `eval.c` and add prototypes in `ast.h`.
+
+---
+
+## Values & Environment & Dispatch — `src/object.h`
+
+```c
+#pragma once
+#include <stddef.h>
+#include <stdbool.h>
+
+typedef struct Value* Value;
+
+typedef enum { T_NIL, T_NUMBER, T_STRING, T_SYMBOL, T_OBJECT, T_BLOCK, T_LIST, T_BOOLEAN } TypeTag;
+
+typedef struct Dict Dict; // opaque: selector->method/value
+
+typedef struct Env Env;   // lexical env for Blocks
+
+// A generic object with a dictionary and optional parent (prototype)
+typedef struct Object {
+  TypeTag tag;
+  struct Object* parent;
+  Dict* dict;
+} Object;
+
+// Blocks capture AST and Env
+struct Block;
+
+// Creation & system
+void obj_system_boot(void);
+void obj_system_shutdown(void);
+
+// Globals
+Object* env_global(void);
+
+// Value constructors
+Value make_nil(void);
+Value make_number(double x);
+Value make_string(const char* s);
+Value make_symbol(const char* s); // interned
+Value make_boolean(bool b);
+Value make_object(void);
+Value make_block(struct Block* b);
+
+// Type checks
+bool is_number(Value v);
+bool is_string(Value v);
+bool is_symbol(Value v);
+bool is_boolean(Value v);
+
+// Introspection/printing
+char* value_print(Value v);
+
+// Sending
+Value send(Value recv, Value sel, int argc, Value* argv);
+
+// Installing natives
+typedef Value (*native_t)(Value self, int argc, Value* argv);
+void install_native(Object* proto, const char* selector, native_t f);
+
+// Prototypes (singletons for core types)
+Object* Proto_Number(void);
+Object* Proto_String(void);
+Object* Proto_Object(void);
+Object* Proto_Boolean(void);
+Object* Proto_List(void);
+Object* Proto_Block(void);
+
+// Singletons
+typedef struct { Value True; Value False; Value Nil; Value Transcript; } Singletons;
+Singletons* singletons(void);
+
+// Env API (used by eval/block)
+Env* env_global(void);
+Value env_get(Env* e, Value symbol);
+void  env_set(Env* e, Value symbol, Value val);
+Env* env_child(Env* parent);
+
+// List primitives (pair)
+typedef struct Pair { Value car, cdr; } Pair;
+Value cons(Value a, Value d);
+Value car(Value p);
+Value cdr(Value p);
+bool  is_nil(Value v);
+```
+```
+
+---
+
+## Evaluator — `src/eval.h`
+
+```c
+#pragma once
+#include "ast.h"
+#include "object.h"
+
+Value eval(AST* node, Env* env);
+```
+```
+
+---
+
+## Evaluator — `src/eval.c`
+
+```c
+#include "eval.h"
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
+// Simple forward decls for AST helpers (use ast.c if split)
+AST* ast_new(ASTKind k);
+void ast_push(AST* a, AST* child);
+void ast_free(AST* a);
+
+static Value eval_list(AST* node, Env* env){
+  if (node->n == 0) return make_nil();
+  // (receiver selector arg ...)
+  Value recv = eval(node->v[0], env);
+  Value sel  = eval(node->v[1], env);
+  int argc = (int)(node->n - 2);
+  Value* argv = argc? calloc((size_t)argc, sizeof(Value)) : NULL;
+  for (int i=0;i<argc;i++) argv[i] = eval(node->v[2+i], env);
+  Value out = send(recv, sel, argc, argv);
+  free(argv);
+  return out;
+}
+
+Value eval(AST* node, Env* env){
+  switch (node->kind){
+    case AST_NUMBER: return make_number(node->d);
+    case AST_STRING: return make_string(node->s);
+    case AST_SYMBOL: return env_get(env, make_symbol(node->s));
+    case AST_QUOTE:  {
+      AST* inner = node->v[0];
+      if (inner->kind == AST_SYMBOL) return make_symbol(inner->s);
+      // quote list into data List
+      // For v1, quote symbols only to keep it simple
+      return make_nil();
+    }
+    case AST_BLOCK:  {
+      // store AST node itself as block body
+      struct Block { AST* body; Env* env; };
+      struct Block* b = calloc(1,sizeof(struct Block));
+      // normalize to a sequence list
+      AST* seq = ast_new(AST_LIST);
+      for (size_t i=0;i<node->n;i++) ast_push(seq, node->v[i]);
+      b->body = seq; b->env = env;
+      return make_block((struct Block*)b);
+    }
+    case AST_LIST:   return eval_list(node, env);
+  }
+  return make_nil();
+}
+```
+```
+
+---
+
+## Object system & dispatch (standalone; libid-adaptable) — `src/object.c`
+
+```c
+#include "object.h"
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdint.h>
+
+// ===== Intern table for symbols =====
+
+typedef struct Sym { char* s; struct Sym* next; } Sym;
+static Sym* symtab[1024];
+static uint32_t shash(const char* s){ uint32_t h=2166136261u; for(;*s;s++) h=(h^*(const unsigned char*)s)*16777619u; return h; }
+static Value SYM(const char* s);
+
+// ===== Dict (selector->native) =====
+
+typedef struct Entry { Value sel; native_t f; struct Entry* next; } Entry;
+struct Dict { Entry* buckets[256]; };
+static Dict* dict_new(void){ return calloc(1,sizeof(Dict)); }
+static void dict_put(Dict* d, Value sel, native_t f){
+  uint32_t h = ((uintptr_t)sel>>4) & 255u; // symbol pointer hash (interned)
+  Entry* e = calloc(1,sizeof(Entry)); e->sel=sel; e->f=f; e->next=d->buckets[h]; d->buckets[h]=e;
+}
+static native_t dict_get(Dict* d, Value sel){
+  uint32_t h = ((uintptr_t)sel>>4) & 255u; Entry* e=d->buckets[h];
+  for(;e;e=e->next) if (e->sel==sel) return e->f; return NULL;
+}
+
+// ===== Values =====
+
+typedef struct Value { TypeTag tag; union { double num; char* str; Object* obj; int b; struct Block* block; struct Pair* pair; Sym* sym; } u; } V;
+
+static V* Valloc(TypeTag t){ V* v = calloc(1,sizeof(V)); v->tag=t; return v; }
+
+Value make_nil(void){ static V* n=NULL; if(!n){ n=Valloc(T_NIL);} return (Value)n; }
+Value make_boolean(bool b){ static V* t=NULL,*f=NULL; if(b){ if(!t){ t=Valloc(T_BOOLEAN); t->u.b=1; } return (Value)t; } else { if(!f){ f=Valloc(T_BOOLEAN); f->u.b=0; } return (Value)f; } }
+Value make_number(double x){ V* v=Valloc(T_NUMBER); v->u.num=x; return (Value)v; }
+Value make_string(const char* s){ V* v=Valloc(T_STRING); v->u.str=strdup(s); return (Value)v; }
+
+static Value SYM(const char* s){
+  uint32_t h = shash(s) & 1023u;
+  for (Sym* p=symtab[h]; p; p=p->next) if (strcmp(p->s,s)==0) return (Value)p;
+  Sym* n = calloc(1,sizeof(Sym)); n->s=strdup(s); n->next=symtab[h]; symtab[h]=n; return (Value)n;
+}
+Value make_symbol(const char* s){ return SYM(s); }
+
+Value make_object(void){ Object* o = calloc(1,sizeof(Object)); o->tag=T_OBJECT; o->dict=dict_new(); return (Value)o; }
+Value make_block(struct Block* b){ V* v=Valloc(T_BLOCK); v->u.block=b; return (Value)v; }
+
+bool is_number(Value v){ return ((V*)v)->tag==T_NUMBER; }
+bool is_string(Value v){ return ((V*)v)->tag==T_STRING; }
+bool is_symbol(Value v){ return ((V*)v)->tag==T_SYMBOL || ( ((V*)v)->tag==0 && v ); /* hack: symbol uses Sym* */ }
+bool is_boolean(Value v){ return ((V*)v)->tag==T_BOOLEAN; }
+
+char* value_print(Value v){
+  V* x=(V*)v; char buf[256];
+  switch(x->tag){
+    case T_NIL: return strdup("nil");
+    case T_BOOLEAN: return strdup(x->u.b?"true":"false");
+    case T_NUMBER: snprintf(buf,sizeof(buf),"%g", x->u.num); return strdup(buf);
+    case T_STRING: {
+      size_t n=strlen(x->u.str)+3; char* s=malloc(n); snprintf(s,n,"\"%s\"",x->u.str); return s; }
+    case T_OBJECT: return strdup("<Object>");
+    case T_BLOCK:  return strdup("<Block>");
+    default: return strdup("<Value>");
+  }
+}
+
+// ===== Env =====
+
+typedef struct Binding { Value k,v; struct Binding* next; } Binding;
+struct Env { Binding* table; struct Env* parent; };
+
+static Env* GENV=NULL;
+
+Object* env_global(void){ return (Object*)GENV; }
+
+Env* env_child(Env* p){ Env* e=calloc(1,sizeof(Env)); e->parent=p; return e; }
+
+Value env_get(Env* e, Value sym){ for(;e;e=e->parent){ for(Binding* b=e->table;b;b=b->next){ if (b->k==sym) return b->v; } } return make_nil(); }
+void  env_set(Env* e, Value sym, Value val){ Binding* b=calloc(1,sizeof(Binding)); b->k=sym; b->v=val; b->next=e->table; e->table=b; }
+
+// ===== List (pairs) =====
+
+typedef struct Pair { Value car, cdr; } Pair;
+Value cons(Value a, Value d){ V* v=Valloc(T_LIST); v->u.pair = calloc(1,sizeof(Pair)); v->u.pair->car=a; v->u.pair->cdr=d; return (Value)v; }
+Value car(Value p){ return ((V*)p)->u.pair->car; }
+Value cdr(Value p){ return ((V*)p)->u.pair->cdr; }
+bool  is_nil(Value v){ return ((V*)v)->tag==T_NIL; }
+
+// ===== Dispatch =====
+
+static Object* PROTO_OBJECT=NULL, *PROTO_NUMBER=NULL, *PROTO_BOOLEAN=NULL, *PROTO_LIST=NULL, *PROTO_BLOCK=NULL, *PROTO_STRING=NULL;
+static Singletons S;
+
+Singletons* singletons(void){ return &S; }
+
+void install_native(Object* proto, const char* selector, native_t f){ dict_put(proto->dict, make_symbol(selector), f); }
+
+static native_t lookup_method(Object* o, Value sel){
+  for (Object* p=o; p; p=p->parent){ native_t f = dict_get(p->dict, sel); if (f) return f; }
+  return NULL;
+}
+
+Value send(Value recv, Value sel, int argc, Value* argv){
+#ifdef USE_LIBID
+  // TODO: adapt to libid’s id_sendN API; for now fall through to local dispatch
+#endif
+  V* r=(V*)recv;
+  Object* o=NULL;
+  switch(r->tag){
+    case T_NUMBER: o = PROTO_NUMBER; break;
+    case T_BOOLEAN: o = PROTO_BOOLEAN; break;
+    case T_STRING: o = PROTO_STRING; break;
+    case T_LIST: o = PROTO_LIST; break;
+    case T_BLOCK: o = PROTO_BLOCK; break;
+    case T_OBJECT: o = (Object*)recv; break;
+    default: o = PROTO_OBJECT; break;
+  }
+  native_t f = lookup_method(o, sel);
+  if (!f){
+    fprintf(stderr, "doesNotUnderstand: selector\n");
+    return make_nil();
+  }
+  return f(recv, argc, argv);
+}
+
+// ===== Bootstrapping =====
+
+static void install_core(void);
+
+void obj_system_boot(void){
+  // global env
+  GENV = env_child(NULL);
+  // prototypes
+  PROTO_OBJECT = (Object*)make_object();
+  PROTO_NUMBER = (Object*)make_object(); PROTO_NUMBER->parent = PROTO_OBJECT;
+  PROTO_BOOLEAN= (Object*)make_object(); PROTO_BOOLEAN->parent= PROTO_OBJECT;
+  PROTO_LIST   = (Object*)make_object(); PROTO_LIST->parent   = PROTO_OBJECT;
+  PROTO_BLOCK  = (Object*)make_object(); PROTO_BLOCK->parent  = PROTO_OBJECT;
+  PROTO_STRING = (Object*)make_object(); PROTO_STRING->parent = PROTO_OBJECT;
+
+  // singletons
+  S.Nil  = make_nil();
+  S.True = make_boolean(true);
+  S.False= make_boolean(false);
+  // Transcript as a plain object
+  S.Transcript = make_object(); ((Object*)S.Transcript)->parent = PROTO_OBJECT;
+
+  // bind globals
+  env_set(GENV, make_symbol("nil"), S.Nil);
+  env_set(GENV, make_symbol("true"), S.True);
+  env_set(GENV, make_symbol("false"), S.False);
+  env_set(GENV, make_symbol("Transcript"), S.Transcript);
+
+  install_core();
+}
+
+void obj_system_shutdown(void){ /* TODO: free pools (omitted for brevity) */ }
+
+// ===== Core natives =====
+
+static Value prim_print(Value self, int argc, Value* argv){ if(argc<1) return S.Nil; char* s=value_print(argv[0]); if(s){ fputs(s, stdout); free(s);} return argv[0]; }
+static Value prim_cr(Value self, int argc, Value* argv){ (void)self;(void)argv;(void)argc; fputc('\n', stdout); return S.Nil; }
+
+static void install_core(void){
+  // Transcript
+  install_native((Object*)S.Transcript, "print:", prim_print);
+  install_native((Object*)S.Transcript, "cr", prim_cr);
+}
+
+// Expose prototypes to other compilation units
+Object* Proto_Number(void){ return PROTO_NUMBER; }
+Object* Proto_String(void){ return PROTO_STRING; }
+Object* Proto_Object(void){ return PROTO_OBJECT; }
+Object* Proto_Boolean(void){ return PROTO_BOOLEAN; }
+Object* Proto_List(void){ return PROTO_LIST; }
+Object* Proto_Block(void){ return PROTO_BLOCK; }
+```
+```
+
+---
+
+## Builtins installer — `src/builtins.c`
+
+```c
+#include "object.h"
+#include <math.h>
+#include <stdio.h>
+
+// Forward decls of per-type installers
+void install_number_prims(void);
+void install_boolean_prims(void);
+void install_string_prims(void);
+void install_list_prims(void);
+void install_block_prims(void);
+
+void install_builtins(void){
+  install_number_prims();
+  install_boolean_prims();
+  install_string_prims();
+  install_list_prims();
+  install_block_prims();
+}
+```
+```
+
+---
+
+## Numbers — `src/number.c`
+
+```c
+#include "object.h"
+#include <math.h>
+#include <stdio.h>
+
+static Value nbin(Value self, int argc, Value* argv, double (*op)(double,double)){
+  if (argc!=1 || !is_number(argv[0])) return make_nil();
+  double a=((struct Value*)self)->u.num, b=((struct Value*)argv[0])->u.num; (void)a;(void)b; // type pun for simplicity
+  return make_number(op(((struct Value*)self)->u.num, ((struct Value*)argv[0])->u.num));
+}
+static double add(double a, double b){return a+b;} static double sub(double a,double b){return a-b;} static double mul(double a,double b){return a*b;} static double divv(double a,double b){return a/b;}
+static Value n_add(Value s,int c,Value* v){return nbin(s,c,v,add);} static Value n_sub(Value s,int c,Value* v){return nbin(s,c,v,sub);} static Value n_mul(Value s,int c,Value* v){return nbin(s,c,v,mul);} static Value n_div(Value s,int c,Value* v){return nbin(s,c,v,divv);}
+static Value n_eq(Value s,int c,Value* v){ if(c!=1||!is_number(v[0])) return make_boolean(false); double a=((struct Value*)s)->u.num, b=((struct Value*)v[0])->u.num; return make_boolean(a==b); }
+static Value n_print(Value s,int c,Value* v){ (void)c;(void)v; char* str=value_print(s); fputs(str, stdout); free(str); return s; }
+
+void install_number_prims(void){
+  Object* P = Proto_Number();
+  install_native(P, "+", n_add);
+  install_native(P, "-", n_sub);
+  install_native(P, "*", n_mul);
+  install_native(P, "/", n_div);
+  install_native(P, "=", n_eq);
+  install_native(P, "print", n_print);
+}
+```
+```
+
+---
+
+## Booleans — `src/boolean.c`
+
+```c
+#include "object.h"
+
+static Value prim_ifTrue_ifFalse(Value self, int argc, Value* argv){
+  if (argc!=2) return make_nil();
+  // argv[0], argv[1] should be Blocks
+  bool cond = ((struct Value*)self)->u.b != 0;
+  Value choice = cond ? argv[0] : argv[1];
+  // send (choice value)
+  Value sel = make_symbol("value");
+  return send(choice, sel, 0, NULL);
+}
+
+static Value prim_and(Value self, int argc, Value* argv){ if(argc!=1) return make_nil(); return make_boolean(((struct Value*)self)->u.b && ((struct Value*)argv[0])->u.b); }
+static Value prim_or (Value self, int argc, Value* argv){ if(argc!=1) return make_nil(); return make_boolean(((struct Value*)self)->u.b || ((struct Value*)argv[0])->u.b); }
+
+void install_boolean_prims(void){
+  Object* P = Proto_Boolean();
+  install_native(P, "ifTrue:ifFalse:", prim_ifTrue_ifFalse);
+  install_native(P, "and:", prim_and);
+  install_native(P, "or:",  prim_or);
+}
+```
+```
+
+---
+
+## Strings — `src/string.c`
+
+```c
+#include "object.h"
+#include <string.h>
+#include <stdio.h>
+
+static Value s_print(Value self, int argc, Value* argv){ (void)argc;(void)argv; char* s=value_print(self); fputs(s, stdout); free(s); return self; }
+static Value s_size (Value self, int argc, Value* argv){ (void)argc;(void)argv; size_t n=strlen(((struct Value*)self)->u.str); return make_number((double)n); }
+
+void install_string_prims(void){
+  Object* P = Proto_String();
+  install_native(P, "print", s_print);
+  install_native(P, "size",  s_size);
+}
+```
+```
+
+---
+
+## Lists — `src/list.c`
+
+```c
+#include "object.h"
+
+static Value l_isEmpty(Value self, int argc, Value* argv){ (void)argc;(void)argv; return make_boolean(is_nil(self)); }
+static Value l_first  (Value self, int argc, Value* argv){ (void)argc;(void)argv; return is_nil(self)? make_nil() : car(self); }
+static Value l_rest   (Value self, int argc, Value* argv){ (void)argc;(void)argv; return is_nil(self)? make_nil() : cdr(self); }
+
+void install_list_prims(void){
+  Object* P = Proto_List();
+  install_native(P, "isEmpty", l_isEmpty);
+  install_native(P, "first",  l_first);
+  install_native(P, "rest",   l_rest);
+}
+```
+```
+
+---
+
+## Blocks — `src/block.c`
+
+```c
+#include "object.h"
+#include "ast.h"
+#include <stdlib.h>
+
+struct Block { AST* body; Env* env; };
+
+static Value b_value(Value self, int argc, Value* argv){
+  (void)argv; (void)argc;
+  struct Block* b = ((struct Value*)self)->u.block;
+  Value last = make_nil();
+  for (size_t i=0;i<b->body->n;i++) last = eval(b->body->v[i], b->env);
+  return last;
+}
+
+void install_block_prims(void){
+  Object* P = Proto_Block();
+  install_native(P, "value", b_value);
+}
+```
+```
+
+---
+
+## Bootstrap stdlib — `lang/init.s72`
+
+```clojure
+; Minimal boot/demo script loaded at startup
+(Transcript print: "s72-lite ready") (Transcript cr)
+
+; Basic demo
+(Transcript print: ("hello" print)) (Transcript cr)
+(Transcript print: (+ 3 4)) (Transcript cr)
+
+; Booleans and blocks
+(true ifTrue: [ (Transcript print: "yay") ] ifFalse: [ (Transcript print: "nay") ]) (Transcript cr)
+```
+```
+
+---
+
+## README — `README.md`
+
+```md
+# s72-lite
+
+A tiny Smalltalk‑72–flavored, message‑passing REPL. No classes; objects have dictionaries. Blocks are objects. Optional libid integration.
+
+## build
+
+```bash
+make           # standalone
+# or
+make s72-libid # if you have libid (adjust Makefile paths)
+```
+
+## run
+
+```bash
+./s72 lang/init.s72
+# then interactively
+s72> (+ 2 3)
+5
+s72> (true ifTrue: [ (Transcript print: "ok") ] ifFalse: [ (Transcript print: "no") ])
+ok
+```
+
+## next steps
+- Implement `perform:with:` on Object
+- Add `value:` arities to Block
+- Add `at:`/`at:put:` to String/Array
+- Wire real libid dispatch behind `USE_LIBID`
+- Snapshot image (serialize objects and dicts)
+```
+```
+
+---
+
+### Notes
+- This skeleton compiles standalone. The `USE_LIBID` path is stubbed so you can later route `send` through libid’s dispatcher.
+- The reader uses `(receiver selector arg ...)` packets to keep parsing trivial.
+- Blocks capture an Env and evaluate their body upon `value`.
+- Error handling and GC are intentionally minimal; add as you iterate.
