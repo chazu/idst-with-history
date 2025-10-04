@@ -14,7 +14,11 @@ TESTS = test1_selector_interning \
         test3_memory_allocation \
         test4_method_installation \
         test5_import_export \
-        test6_arm64_stress
+        test6_arm64_stress \
+        test7_method_dispatch \
+        test8_error_handling \
+        test9_performance \
+        test10_arm64_specific
 
 COMPILATION_TEST = test_compilation_only
 TEST_RUNNER = run_all_tests
@@ -41,6 +45,18 @@ test5_import_export: test5_import_export.c $(LIBID_OBJ)
 	$(CC) $(CFLAGS) $(INCLUDES) $< $(LIBID_OBJ) $(LDFLAGS) -o $@
 
 test6_arm64_stress: test6_arm64_stress.c $(LIBID_OBJ)
+	$(CC) $(CFLAGS) $(INCLUDES) $< $(LIBID_OBJ) $(LDFLAGS) -o $@
+
+test7_method_dispatch: test7_method_dispatch.c $(LIBID_OBJ)
+	$(CC) $(CFLAGS) $(INCLUDES) $< $(LIBID_OBJ) $(LDFLAGS) -o $@
+
+test8_error_handling: test8_error_handling.c $(LIBID_OBJ)
+	$(CC) $(CFLAGS) $(INCLUDES) $< $(LIBID_OBJ) $(LDFLAGS) -o $@
+
+test9_performance: test9_performance.c $(LIBID_OBJ)
+	$(CC) $(CFLAGS) $(INCLUDES) $< $(LIBID_OBJ) $(LDFLAGS) -o $@
+
+test10_arm64_specific: test10_arm64_specific.c $(LIBID_OBJ)
 	$(CC) $(CFLAGS) $(INCLUDES) $< $(LIBID_OBJ) $(LDFLAGS) -o $@
 
 # Compilation-only test (no runtime initialization)
@@ -99,6 +115,22 @@ test5: test5_import_export
 test6: test6_arm64_stress
 	@echo "🧪 Running Test 6: ARM64 Stress Test"
 	./test6_arm64_stress
+
+test7: test7_method_dispatch
+	@echo "🧪 Running Test 7: Method Dispatch"
+	./test7_method_dispatch
+
+test8: test8_error_handling
+	@echo "🧪 Running Test 8: Error Handling"
+	./test8_error_handling
+
+test9: test9_performance
+	@echo "🧪 Running Test 9: Performance"
+	./test9_performance
+
+test10: test10_arm64_specific
+	@echo "🧪 Running Test 10: ARM64 Specific"
+	./test10_arm64_specific
 
 # Quick test (just compile, don't run)
 compile-test: all

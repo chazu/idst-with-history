@@ -45,6 +45,26 @@ static test_info_t tests[] = {
         "Test 6",
         "./test6_arm64_stress",
         "ARM64 Stress Test and Macro Verification"
+    },
+    {
+        "Test 7",
+        "./test7_method_dispatch",
+        "Method Dispatch and Calling"
+    },
+    {
+        "Test 8",
+        "./test8_error_handling",
+        "Error Handling and Edge Cases"
+    },
+    {
+        "Test 9",
+        "./test9_performance",
+        "Performance and Scalability"
+    },
+    {
+        "Test 10",
+        "./test10_arm64_specific",
+        "ARM64-Specific Features"
     }
 };
 
