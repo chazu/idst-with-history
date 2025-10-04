@@ -24,16 +24,16 @@ $(BIN)./include :
 		find $(BIN)./include/gc -name .svn -exec rm -rf {} \;'
 
 $(BIN)libid.o : libid_enhanced.c $(BIN)./include
-	$(CC) $(CFLAGS) -DPREFIX='"@PREFIX@"' $< -c -o $@
+	$(CC) $(CFLAGS) -DNO_GC=1 -DPREFIX='"@PREFIX@"' $< -c -o $@
 
 $(BIN)libid_p.o : libid_enhanced.c $(BIN)./include
-	$(CC) $(PFLAGS) -pg -DPREFIX='"@PREFIX@"' $< -c -o $@
+	$(CC) $(PFLAGS) -pg -DNO_GC=1 -DPREFIX='"@PREFIX@"' $< -c -o $@
 
 $(BIN)libid_g.o : libid_enhanced.c $(BIN)./include
-	$(CC) $(GFLAGS) -g -DPREFIX='"@PREFIX@"' $< -c -o $@
+	$(CC) $(GFLAGS) -g -DNO_GC=1 -DPREFIX='"@PREFIX@"' $< -c -o $@
 
 $(BIN)libid_k.o : libid_enhanced.c $(BIN)./include
-	$(CC) $(CCFLAGS_K) -DPREFIX='"@PREFIX@"' $< -c -o $@
+	$(CC) $(CCFLAGS_K) -DNO_GC=1 -DPREFIX='"@PREFIX@"' $< -c -o $@
 
 
 install : $(PREFIX)libid.o $(PREFIX)libid_p.o $(PREFIX)libid_g.o
