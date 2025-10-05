@@ -91,6 +91,11 @@ test-full: all
 	@echo ""
 	./$(TEST_RUNNER)
 
+# Run tests in quiet mode (less verbose output)
+test-quiet: all
+	@echo "🧪 Running Enhanced libid Test Suite (Quiet Mode)..."
+	./$(TEST_RUNNER) -q
+
 # Run individual tests
 test1: test1_selector_interning
 	@echo "🧪 Running Test 1: Selector Interning"
@@ -174,6 +179,7 @@ info:
 	@echo "  make all          - Build all test executables"
 	@echo "  make test         - Run working test suite (compilation + verification)"
 	@echo "  make test-full    - Run full test suite (may hang)"
+	@echo "  make test-quiet   - Run full test suite with minimal output"
 	@echo "  make verify       - Run compilation verification test"
 	@echo "  make test1-6      - Run individual tests (may hang)"
 	@echo "  make compile-test - Just verify compilation"
@@ -204,4 +210,4 @@ check-deps:
 # Help target
 help: info
 
-.PHONY: all test test1 test2 test3 test4 test5 test6 compile-test test-verbose clean info check-deps help
+.PHONY: all test test1 test2 test3 test4 test5 test6 compile-test test-verbose test-quiet clean info check-deps help

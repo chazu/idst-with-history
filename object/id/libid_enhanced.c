@@ -15,7 +15,86 @@
 #endif
 
 #include <stdarg.h>
+
 #include "libid_enhanced.h"
+
+// Redefine macros to use the global _libid struct directly (not a pointer)
+#undef _sendv0
+#undef _sendv1
+#undef _sendv2
+#undef _sendv3
+#undef _sendv4
+#undef _sendv5
+#undef _superv0
+#undef _superv1
+#undef _superv2
+#undef _superv3
+#undef _superv4
+
+#define _sendv0(MSG, RCV) ({						\
+  struct __send _s= { (MSG), 1, (RCV), NULL, NULL };			\
+  ((_imp_t)(_libid.bindv(&_s)))(&_s, _s.receiver, _s.receiver);		\
+})
+
+#define _sendv1(MSG, RCV, A1) ({					\
+  struct __send _s= { (MSG), 2, (RCV), NULL, NULL };			\
+  ((_imp_t)(_libid.bindv(&_s)))(&_s, _s.receiver, _s.receiver, A1);	\
+})
+
+#define _sendv2(MSG, RCV, A1, A2) ({					\
+  struct __send _s= { (MSG), 3, (RCV), NULL, NULL };			\
+  ((_imp_t)(_libid.bindv(&_s)))(&_s, _s.receiver, _s.receiver, A1, A2);	\
+})
+
+#define _sendv3(MSG, RCV, A1, A2, A3) ({				\
+  struct __send _s= { (MSG), 4, (RCV), NULL, NULL };			\
+  ((_imp_t)(_libid.bindv(&_s)))(&_s, _s.receiver, _s.receiver, A1, A2, A3); \
+})
+
+#define _sendv4(MSG, RCV, A1, A2, A3, A4) ({				\
+  struct __send _s= { (MSG), 5, (RCV), NULL, NULL };			\
+  ((_imp_t)(_libid.bindv(&_s)))(&_s, _s.receiver, _s.receiver, A1, A2, A3, A4); \
+})
+
+#define _sendv5(MSG, RCV, A1, A2, A3, A4, A5) ({			\
+  struct __send _s= { (MSG), 6, (RCV), NULL, NULL };			\
+  ((_imp_t)(_libid.bindv(&_s)))(&_s, _s.receiver, _s.receiver, A1, A2, A3, A4, A5); \
+})
+
+#define _superv0(TYP, MSG, RCV) ({					\
+  struct __send _s= { (MSG), 1, (TYP) };				\
+  _imp_t _imp= _libid.bindv(&_s);					\
+  _s.receiver= (RCV);							\
+  _imp(&_s, _s.receiver, _s.receiver);					\
+})
+
+#define _superv1(TYP, MSG, RCV, A1) ({					\
+  struct __send _s= { (MSG), 2, (TYP) };				\
+  _imp_t _imp= _libid.bindv(&_s);					\
+  _s.receiver= (RCV);							\
+  _imp(&_s, _s.receiver, _s.receiver, A1);				\
+})
+
+#define _superv2(TYP, MSG, RCV, A1, A2) ({				\
+  struct __send _s= { (MSG), 3, (TYP) };				\
+  _imp_t _imp= _libid.bindv(&_s);					\
+  _s.receiver= (RCV);							\
+  _imp(&_s, _s.receiver, _s.receiver, A1, A2);				\
+})
+
+#define _superv3(TYP, MSG, RCV, A1, A2, A3) ({				\
+  struct __send _s= { (MSG), 4, (TYP) };				\
+  _imp_t _imp= _libid.bindv(&_s);					\
+  _s.receiver= (RCV);							\
+  _imp(&_s, _s.receiver, _s.receiver, A1, A2, A3);			\
+})
+
+#define _superv4(TYP, MSG, RCV, A1, A2, A3, A4) ({			\
+  struct __send _s= { (MSG), 5, (TYP) };				\
+  _imp_t _imp= _libid.bindv(&_s);					\
+  _s.receiver= (RCV);							\
+  _imp(&_s, _s.receiver, _s.receiver, A1, A2, A3, A4);			\
+})
 
 struct __send;
 
@@ -1238,6 +1317,8 @@ struct __libid *_libid_init(int *argcp, char ***argvp, char ***envpp)
   _libid.gc_gcollect			    = _libid.dlsym(RTLD_DEFAULT, "GC_gcollect");
   _libid.gc_unregisterDisappearingLink	    = _libid.dlsym(RTLD_DEFAULT, "GC_unregister_disappearing_link");
   _libid.gc_generalRegisterDisappearingLink = _libid.dlsym(RTLD_DEFAULT, "GC_general_register_disappearing_link");
+
+
 
   return &_libid;
 }

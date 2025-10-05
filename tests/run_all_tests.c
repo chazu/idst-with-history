@@ -70,16 +70,25 @@ static test_info_t tests[] = {
 
 static int num_tests = sizeof(tests) / sizeof(tests[0]);
 
-int run_test(const test_info_t *test)
+int run_test(const test_info_t *test, int quiet_mode)
 {
-    printf("\n" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "\n");
-    printf("Running %s: %s\n", test->name, test->description);
-    printf("Executable: %s\n", test->executable);
-    printf("" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "\n");
+    if (!quiet_mode) {
+        printf("\n" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "\n");
+        printf("Running %s: %s\n", test->name, test->description);
+        printf("Executable: %s\n", test->executable);
+        printf("" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "\n");
+    } else {
+        printf("Running %s... ", test->name);
+        fflush(stdout);
+    }
     
     // Check if executable exists
     if (access(test->executable, X_OK) != 0) {
-        printf("❌ SKIP: Executable %s not found or not executable\n", test->executable);
+        if (quiet_mode) {
+            printf("SKIP (not found)\n");
+        } else {
+            printf("❌ SKIP: Executable %s not found or not executable\n", test->executable);
+        }
         return -1;  // Skip
     }
     
@@ -90,9 +99,15 @@ int run_test(const test_info_t *test)
     pid_t pid = fork();
     if (pid == 0) {
         // Child process - execute the test
+        if (quiet_mode) {
+            // Redirect stdout to /dev/null in quiet mode
+            freopen("/dev/null", "w", stdout);
+        }
         execl(test->executable, test->executable, NULL);
         // If we get here, exec failed
-        printf("❌ FAIL: Could not execute %s\n", test->executable);
+        if (!quiet_mode) {
+            printf("❌ FAIL: Could not execute %s\n", test->executable);
+        }
         exit(1);
     } else if (pid > 0) {
         // Parent process - wait for child
@@ -105,19 +120,35 @@ int run_test(const test_info_t *test)
         if (WIFEXITED(status)) {
             int exit_code = WEXITSTATUS(status);
             if (exit_code == 0) {
-                printf("\n✅ %s PASSED (%.1f seconds)\n", test->name, elapsed);
+                if (quiet_mode) {
+                    printf("PASSED (%.1fs)\n", elapsed);
+                } else {
+                    printf("\n✅ %s PASSED (%.1f seconds)\n", test->name, elapsed);
+                }
                 return 1;  // Success
             } else {
-                printf("\n❌ %s FAILED with exit code %d (%.1f seconds)\n", test->name, exit_code, elapsed);
+                if (quiet_mode) {
+                    printf("FAILED (exit code %d, %.1fs)\n", exit_code, elapsed);
+                } else {
+                    printf("\n❌ %s FAILED with exit code %d (%.1f seconds)\n", test->name, exit_code, elapsed);
+                }
                 return 0;  // Failure
             }
         } else {
-            printf("\n❌ %s CRASHED or was terminated (%.1f seconds)\n", test->name, elapsed);
+            if (quiet_mode) {
+                printf("CRASHED (%.1fs)\n", elapsed);
+            } else {
+                printf("\n❌ %s CRASHED or was terminated (%.1f seconds)\n", test->name, elapsed);
+            }
             return 0;  // Failure
         }
     } else {
         // Fork failed
-        printf("❌ FAIL: Could not fork process for %s\n", test->name);
+        if (quiet_mode) {
+            printf("FORK FAILED\n");
+        } else {
+            printf("❌ FAIL: Could not fork process for %s\n", test->name);
+        }
         return 0;  // Failure
     }
 }
@@ -163,10 +194,27 @@ void print_system_info()
 
 int main(int argc, char **argv)
 {
-    printf("🧪 Enhanced libid Test Suite\n");
+    int quiet_mode = 0;
+
+    // Check for quiet mode flag
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-q") == 0 || strcmp(argv[i], "--quiet") == 0) {
+            quiet_mode = 1;
+            break;
+        }
+    }
+
+    printf("🧪 Enhanced libid Test Suite");
+    if (quiet_mode) {
+        printf(" (Quiet Mode)\n");
+    } else {
+        printf("\n");
+    }
     printf("Testing Apple Silicon ARM64 compatibility and numbered macro functionality\n\n");
-    
-    print_system_info();
+
+    if (!quiet_mode) {
+        print_system_info();
+    }
     
     int passed = 0;
     int failed = 0;
@@ -176,8 +224,8 @@ int main(int argc, char **argv)
     
     // Run all tests
     for (int i = 0; i < num_tests; i++) {
-        int result = run_test(&tests[i]);
-        
+        int result = run_test(&tests[i], quiet_mode);
+
         if (result == 1) {
             passed++;
         } else if (result == 0) {

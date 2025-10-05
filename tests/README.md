@@ -15,6 +15,23 @@ The test suite consists of 6 comprehensive tests that verify different aspects o
 
 ## Quick Start
 
+### Running Tests
+
+For a **concise test output** that shows only pass/fail status:
+```bash
+make test-quiet
+```
+
+For **full verbose output** (may be very long):
+```bash
+make test-full
+```
+
+For **compilation verification only** (recommended):
+```bash
+make test
+```
+
 ### Prerequisites
 
 1. **Enhanced libid built**:
@@ -51,6 +68,35 @@ make check-deps
 # Clean up
 make clean
 ```
+
+## Output Modes
+
+### Quiet Mode (`-q` or `--quiet`)
+
+The test runner supports a quiet mode that significantly reduces output verbosity:
+
+- **Suppresses**: Detailed test output, system info, verbose method traces
+- **Shows**: Test names, pass/fail status, timing, and failure details
+- **Usage**: `./run_all_tests -q` or `make test-quiet`
+
+**Example quiet output:**
+```
+🧪 Enhanced libid Test Suite (Quiet Mode)
+Testing Apple Silicon ARM64 compatibility and numbered macro functionality
+
+Running Test 1... PASSED (0.0s)
+Running Test 2... PASSED (0.0s)
+Running Test 7... CRASHED (0.0s)
+Running Test 8... FAILED (exit code 1, 0.0s)
+
+🏁 Test Suite Summary
+======================================================================
+Total Tests: 10
+✅ Passed: 8
+❌ Failed: 2
+```
+
+This mode is especially useful when some tests produce thousands of lines of output (like performance tests), making it impossible to see which tests actually failed.
 
 ## Test Details
 

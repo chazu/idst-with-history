@@ -96,27 +96,64 @@ S72Value s72_object_send(S72Value receiver, oop selector, int argc, S72Value *ar
         }
     }
     
-    // Use enhanced libid dispatch based on argument count
+    // Use libid's public API correctly
     oop result_oop = NULL;
 
+    printf("DEBUG: About to dispatch selector=%p to receiver=%p, argc=%d\n",
+           selector, receiver.obj, argc);
+
+    // Use libid's bind function to find the method
+    printf("DEBUG: Calling _libid.bind(%p, %p)\n", selector, receiver.obj);
+    struct __closure *closure = _libid.bind(selector, receiver.obj);
+    printf("DEBUG: _libid.bind returned %p\n", closure);
+
+    if (!closure) {
+        printf("DEBUG: No closure found for selector\n");
+        s72_error("Method not found");
+        if (libid_args) free(libid_args);
+        return S72_NIL;
+    }
+
+    printf("DEBUG: closure->method = %p\n", closure->method);
+    if (!closure->method) {
+        printf("DEBUG: Closure has no method\n");
+        s72_error("Method not found");
+        if (libid_args) free(libid_args);
+        return S72_NIL;
+    }
+
+    printf("DEBUG: Found method %p\n", closure->method);
+
+    // Create a proper send structure for the method call
+    struct __send send_struct = {
+        .selector = selector,
+        .nArgs = argc + 1,  // +1 for receiver
+        .receiver = receiver.obj,
+        .state = NULL,
+        .closure = closure
+    };
+
+    // Call the method with the proper signature
     switch (argc) {
         case 0:
-            result_oop = _sendv0(selector, receiver.obj);
+            result_oop = closure->method(&send_struct, receiver.obj, receiver.obj);
             break;
         case 1:
-            result_oop = _sendv1(selector, receiver.obj, libid_args[0]);
+            result_oop = closure->method(&send_struct, receiver.obj, receiver.obj, libid_args[0]);
             break;
         case 2:
-            result_oop = _sendv2(selector, receiver.obj, libid_args[0], libid_args[1]);
+            result_oop = closure->method(&send_struct, receiver.obj, receiver.obj, libid_args[0], libid_args[1]);
             break;
         case 3:
-            result_oop = _sendv3(selector, receiver.obj, libid_args[0], libid_args[1], libid_args[2]);
+            result_oop = closure->method(&send_struct, receiver.obj, receiver.obj, libid_args[0], libid_args[1], libid_args[2]);
             break;
         default:
-            s72_error("Too many arguments for message send (max 3 for M0)");
+            s72_error("Too many arguments for message send (max 3 for M1)");
             if (libid_args) free(libid_args);
             return S72_NIL;
     }
+
+    printf("DEBUG: Method returned %p\n", result_oop);
     
     if (libid_args) free(libid_args);
     

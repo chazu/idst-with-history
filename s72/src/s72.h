@@ -27,6 +27,7 @@ oop _libid_alloc(oop type, size_t size);
 void _libid_method(oop type, oop selector, _imp_t method);
 struct __closure *_libid_bind(oop selector, oop receiver);
 _imp_t _libid_bindv(struct __send *send);
+oop _sendv(oop selector, int argc, ...);
 
 // Forward declarations
 typedef struct S72Object S72Object;

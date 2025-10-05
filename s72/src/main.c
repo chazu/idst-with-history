@@ -299,18 +299,23 @@ static void s72_repl(void) {
         }
         
         // Parse and evaluate
+        printf("DEBUG: About to parse input: %s\n", input);
         ASTNode *ast = s72_read_string(input);
+        printf("DEBUG: Parse returned %p\n", ast);
+
         if (!ast) {
             printf("Parse error\n");
             continue;
         }
-        
+
+        printf("DEBUG: About to evaluate AST\n");
         S72Value result = s72_eval(ast, s72_global_env);
-        
+        printf("DEBUG: Evaluation returned %p\n", result.obj);
+
         // Print result
         s72_print_value(result);
         printf("\n");
-        
+
         // Cleanup
         ast_free(ast);
     }

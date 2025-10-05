@@ -2,10 +2,10 @@
 triple:          'arm64-apple-darwin'
 binary-path:     run_all_tests
 relocations:
-  - { offset: 0x26, size: 0x8, addend: 0x0, symName: _run_test, symObjAddr: 0x0, symBinAddr: 0x100003258, symSize: 0x170 }
-  - { offset: 0x54, size: 0x8, addend: 0x0, symName: _tests, symObjAddr: 0xC90, symBinAddr: 0x100008000, symSize: 0x0 }
-  - { offset: 0xAD, size: 0x8, addend: 0x0, symName: _run_test, symObjAddr: 0x0, symBinAddr: 0x100003258, symSize: 0x170 }
-  - { offset: 0x20D, size: 0x8, addend: 0x0, symName: _print_system_info, symObjAddr: 0x170, symBinAddr: 0x1000033C8, symSize: 0x160 }
-  - { offset: 0x30C, size: 0x8, addend: 0x0, symName: _print_system_info, symObjAddr: 0x170, symBinAddr: 0x1000033C8, symSize: 0x160 }
-  - { offset: 0x6D9, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x2D0, symBinAddr: 0x100003528, symSize: 0x300 }
+  - { offset: 0x26, size: 0x8, addend: 0x0, symName: _run_test, symObjAddr: 0x0, symBinAddr: 0x100002FF4, symSize: 0x264 }
+  - { offset: 0x54, size: 0x8, addend: 0x0, symName: _tests, symObjAddr: 0xED0, symBinAddr: 0x100008000, symSize: 0x0 }
+  - { offset: 0xAD, size: 0x8, addend: 0x0, symName: _run_test, symObjAddr: 0x0, symBinAddr: 0x100002FF4, symSize: 0x264 }
+  - { offset: 0x276, size: 0x8, addend: 0x0, symName: _print_system_info, symObjAddr: 0x264, symBinAddr: 0x100003258, symSize: 0x160 }
+  - { offset: 0x594, size: 0x8, addend: 0x0, symName: _print_system_info, symObjAddr: 0x264, symBinAddr: 0x100003258, symSize: 0x160 }
+  - { offset: 0x777, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x3C4, symBinAddr: 0x1000033B8, symSize: 0x3BC }
 ...

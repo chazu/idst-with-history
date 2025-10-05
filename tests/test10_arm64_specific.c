@@ -23,14 +23,19 @@ void *_libid_palloc(size_t size);
 // Include the enhanced macros
 #include "../object/id/libid_enhanced.h"
 
+// Global flag to control verbosity
+static int verbose_output = 1;
+
 // ARM64-specific test methods with various argument patterns
-oop arm64_test_8args(oop closure, oop self, oop receiver, 
+oop arm64_test_8args(oop closure, oop self, oop receiver,
                      oop arg1, oop arg2, oop arg3, oop arg4,
                      oop arg5, oop arg6, oop arg7, oop arg8)
 {
     // ARM64 uses x0-x7 for first 8 args, then stack
-    printf("    → 8-arg method: args=%p,%p,%p,%p,%p,%p,%p,%p\n", 
-           arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+    if (verbose_output) {
+        printf("    → 8-arg method: args=%p,%p,%p,%p,%p,%p,%p,%p\n",
+               arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+    }
     return receiver;
 }
 
@@ -237,14 +242,17 @@ int main(int argc, char **argv, char **envp)
     
     // Test 7: Performance on ARM64
     printf("✓ Testing ARM64-specific performance characteristics...\n");
-    
+
     // Test ARM64 function call performance
     clock_t start = clock();
     const int perf_iterations = 100000;
 
+    // Disable verbose output during performance test
+    verbose_output = 0;
     for (int i = 0; i < perf_iterations; i++) {
         arm64_test_8args(0, test_obj, test_obj, (oop)i, (oop)(i+1), (oop)(i+2), 0, 0, 0, 0, 0);
     }
+    verbose_output = 1;  // Re-enable verbose output
 
     clock_t end = clock();
     double cpu_time = ((double)(end - start)) / CLOCKS_PER_SEC;

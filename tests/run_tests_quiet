@@ -1,0 +1,6 @@
+#!/bin/bash
+# Quick test runner with quiet output
+# Usage: ./run_tests_quiet
+
+cd "$(dirname "$0")"
+./run_all_tests -q

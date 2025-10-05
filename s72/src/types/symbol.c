@@ -47,10 +47,17 @@ S72Value s72_symbol_new(const char *name) {
 }
 
 bool s72_is_symbol(S72Value val) {
-    if (s72_is_nil(val)) return false;
-    
+    printf("DEBUG: s72_is_symbol called with val.obj=%p\n", val.obj);
+
+    if (s72_is_nil(val)) {
+        printf("DEBUG: s72_is_symbol: value is nil\n");
+        return false;
+    }
+
+    printf("DEBUG: s72_is_symbol: about to access vtable\n");
     // Check if the object's vtable matches symbol vtable
     oop vtable = val.obj->_vtable[-1];
+    printf("DEBUG: s72_is_symbol: vtable=%p, s72_symbol_vtable=%p\n", vtable, s72_symbol_vtable);
     return vtable == s72_symbol_vtable;
 }
 
@@ -65,12 +72,15 @@ const char *s72_symbol_name(S72Value val) {
 }
 
 oop s72_symbol_oop(S72Value val) {
+    printf("DEBUG: s72_symbol_oop called with val.obj=%p\n", val.obj);
+
     if (!s72_is_symbol(val)) {
         s72_error("Value is not a symbol");
         return NULL;
     }
-    
+
     S72Symbol *sym = (S72Symbol *)val.obj;
+    printf("DEBUG: sym=%p, sym->interned_oop=%p\n", sym, sym->interned_oop);
     return sym->interned_oop;
 }
 
@@ -126,8 +136,11 @@ void s72_symbol_intern_selectors(void) {
     SEL_EQUALS = S72_INTERN("=");
     SEL_PRINT = S72_INTERN("print");
     SEL_VALUE = S72_INTERN("value");
-    
-    if (!SEL_PLUS || !SEL_MINUS || !SEL_MULTIPLY || !SEL_DIVIDE || 
+
+    printf("DEBUG: Interned selectors - PLUS=%p, MINUS=%p, MULTIPLY=%p\n",
+           SEL_PLUS, SEL_MINUS, SEL_MULTIPLY);
+
+    if (!SEL_PLUS || !SEL_MINUS || !SEL_MULTIPLY || !SEL_DIVIDE ||
         !SEL_EQUALS || !SEL_PRINT || !SEL_VALUE) {
         s72_error("Failed to intern core selectors");
     }

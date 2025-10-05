@@ -12,13 +12,17 @@ void s72_number_init(void) {
         return;
     }
 
-    // Install native methods
-    _libid_method(s72_number_vtable, SEL_PLUS, (_imp_t)s72_number_add);
-    _libid_method(s72_number_vtable, SEL_MINUS, (_imp_t)s72_number_subtract);
-    _libid_method(s72_number_vtable, SEL_MULTIPLY, (_imp_t)s72_number_multiply);
-    _libid_method(s72_number_vtable, SEL_DIVIDE, (_imp_t)s72_number_divide);
-    _libid_method(s72_number_vtable, SEL_EQUALS, (_imp_t)s72_number_equals);
-    _libid_method(s72_number_vtable, SEL_PRINT, (_imp_t)s72_number_print);
+    // Install native methods on the prototype object (not the vtable directly)
+    extern oop s72_number_proto;
+    _libid_method(s72_number_proto, SEL_PLUS, (_imp_t)s72_number_add);
+    _libid_method(s72_number_proto, SEL_MINUS, (_imp_t)s72_number_subtract);
+    _libid_method(s72_number_proto, SEL_MULTIPLY, (_imp_t)s72_number_multiply);
+    _libid_method(s72_number_proto, SEL_DIVIDE, (_imp_t)s72_number_divide);
+    _libid_method(s72_number_proto, SEL_EQUALS, (_imp_t)s72_number_equals);
+    _libid_method(s72_number_proto, SEL_PRINT, (_imp_t)s72_number_print);
+
+    printf("DEBUG: Installed methods on number proto %p (vtable %p)\n",
+           s72_number_proto, s72_number_vtable);
 }
 
 // Number creation and testing
@@ -59,23 +63,28 @@ double s72_number_value(S72Value val) {
 // Number arithmetic methods
 
 oop s72_number_add(struct __send *send, oop self, oop receiver, oop arg) {
+    printf("DEBUG: s72_number_add called - receiver=%p, arg=%p\n", receiver, arg);
+
     if (!arg) {
-        s72_error("+ requires one argument");
+        printf("ERROR: + requires one argument\n");
         return NULL;
     }
-    
+
     S72Value recv_val = {receiver};
     S72Value arg_val = {arg};
-    
+
     if (!s72_is_number(recv_val) || !s72_is_number(arg_val)) {
-        s72_error("+ requires numeric arguments");
+        printf("ERROR: + requires numeric arguments\n");
         return NULL;
     }
-    
+
     double a = s72_number_value(recv_val);
     double b = s72_number_value(arg_val);
-    
+
+    printf("DEBUG: Adding %f + %f\n", a, b);
+
     S72Value result = s72_number_new(a + b);
+    printf("DEBUG: Result = %p\n", result.obj);
     return result.obj;
 }
 
