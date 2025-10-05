@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// Need access to _libid
+extern struct __libid *_libid;
+
 // Global vtables (defined in main.c)
 extern oop s72_object_vtable;
 
@@ -48,7 +51,7 @@ void s72_object_add_method(S72Value obj, oop selector, _imp_t method) {
     
     // For M0, we'll use libid's method installation directly
     // This is a simplified approach - full implementation will use method dictionaries
-    _libid_method(obj.obj, selector, method);
+    _libid->method(obj.obj, selector, method);
 }
 
 void s72_object_add_block_method(S72Value obj, oop selector, oop block) {
@@ -66,7 +69,7 @@ S72Method *s72_object_lookup_method(S72Value obj, oop selector) {
     }
     
     // Use libid's bind to check if method exists
-    struct __closure *closure = _libid_bind(selector, obj.obj);
+    struct __closure *closure = _libid->bind(selector, obj.obj);
     if (closure && closure->method) {
         // Create a temporary method structure
         static S72Method temp_method;
@@ -103,9 +106,9 @@ S72Value s72_object_send(S72Value receiver, oop selector, int argc, S72Value *ar
            selector, receiver.obj, argc);
 
     // Use libid's bind function to find the method
-    printf("DEBUG: Calling _libid.bind(%p, %p)\n", selector, receiver.obj);
-    struct __closure *closure = _libid.bind(selector, receiver.obj);
-    printf("DEBUG: _libid.bind returned %p\n", closure);
+    printf("DEBUG: Calling _libid->bind(%p, %p)\n", selector, receiver.obj);
+    struct __closure *closure = _libid->bind(selector, receiver.obj);
+    printf("DEBUG: _libid->bind returned %p\n", closure);
 
     if (!closure) {
         printf("DEBUG: No closure found for selector\n");

@@ -13,8 +13,8 @@ void s72_symbol_init(void) {
     }
 
     // Install native methods
-    _libid_method(s72_symbol_vtable, SEL_PRINT, (_imp_t)s72_symbol_print);
-    _libid_method(s72_symbol_vtable, SEL_EQUALS, (_imp_t)s72_symbol_equals);
+    S72_METHOD(s72_symbol_vtable, SEL_PRINT, s72_symbol_print);
+    S72_METHOD(s72_symbol_vtable, SEL_EQUALS, s72_symbol_equals);
 }
 
 // Symbol creation and testing
@@ -31,8 +31,7 @@ S72Value s72_symbol_new(const char *name) {
     }
 
     // Create S72 symbol wrapper
-    extern oop s72_symbol_proto;
-    oop sym_oop = S72_ALLOC(s72_symbol_proto, sizeof(S72Symbol));
+    oop sym_oop = S72_ALLOC(s72_symbol_vtable, sizeof(S72Symbol));
     if (!sym_oop) {
         s72_error("Failed to allocate symbol");
         return S72_NIL;
@@ -47,18 +46,14 @@ S72Value s72_symbol_new(const char *name) {
 }
 
 bool s72_is_symbol(S72Value val) {
-    printf("DEBUG: s72_is_symbol called with val.obj=%p\n", val.obj);
-
     if (s72_is_nil(val)) {
-        printf("DEBUG: s72_is_symbol: value is nil\n");
         return false;
     }
 
-    printf("DEBUG: s72_is_symbol: about to access vtable\n");
-    // Check if the object's vtable matches symbol vtable
-    oop vtable = val.obj->_vtable[-1];
-    printf("DEBUG: s72_is_symbol: vtable=%p, s72_symbol_vtable=%p\n", vtable, s72_symbol_vtable);
-    return vtable == s72_symbol_vtable;
+    // For M0, we'll use a simple heuristic:
+    // Check if this looks like a symbol object
+    S72Symbol *sym = (S72Symbol *)val.obj;
+    return sym && sym->name && sym->interned_oop;
 }
 
 const char *s72_symbol_name(S72Value val) {
@@ -129,13 +124,13 @@ oop s72_symbol_equals(struct __send *send, oop self, oop receiver, oop arg) {
 // Symbol table management
 void s72_symbol_intern_selectors(void) {
     // Intern common selectors used throughout the system
-    SEL_PLUS = S72_INTERN("+");
-    SEL_MINUS = S72_INTERN("-");
-    SEL_MULTIPLY = S72_INTERN("*");
-    SEL_DIVIDE = S72_INTERN("/");
-    SEL_EQUALS = S72_INTERN("=");
-    SEL_PRINT = S72_INTERN("print");
-    SEL_VALUE = S72_INTERN("value");
+    SEL_PLUS = _libid->intern("+");
+    SEL_MINUS = _libid->intern("-");
+    SEL_MULTIPLY = _libid->intern("*");
+    SEL_DIVIDE = _libid->intern("/");
+    SEL_EQUALS = _libid->intern("=");
+    SEL_PRINT = _libid->intern("print");
+    SEL_VALUE = _libid->intern("value");
 
     printf("DEBUG: Interned selectors - PLUS=%p, MINUS=%p, MULTIPLY=%p\n",
            SEL_PLUS, SEL_MINUS, SEL_MULTIPLY);

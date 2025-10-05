@@ -5,6 +5,9 @@
 #include "types/symbol.h"
 #include <stdio.h>
 
+// Need access to _libid
+extern struct __libid *_libid;
+
 // Global environment
 S72Env *s72_global_env = NULL;
 
@@ -150,22 +153,22 @@ S72Value s72_eval_list(ASTNode *node, S72Env *env) {
         return S72_NIL;
     }
 
-    // Evaluate selector (must be a symbol)
+    // Evaluate selector - for M0/M1 we assume it's an atom that should be interned
     printf("DEBUG: Evaluating selector\n");
     printf("DEBUG: Selector AST node type: %d\n", node->data.list.elements[1]->type);
-    S72Value selector_val = s72_eval(node->data.list.elements[1], env);
-    printf("DEBUG: Selector evaluated to %p\n", selector_val.obj);
 
-    printf("DEBUG: About to check if selector is symbol\n");
-    if (!s72_is_symbol(selector_val)) {
-        s72_error("Selector must be a symbol");
+    oop selector = NULL;
+    ASTNode *sel_node = node->data.list.elements[1];
+
+    if (sel_node->type == AST_ATOM) {
+        // For selectors, intern the atom directly as a libid selector
+        printf("DEBUG: Interning atom '%s' as selector\n", sel_node->data.atom.name);
+        selector = _libid->intern(sel_node->data.atom.name);
+        printf("DEBUG: Interned selector: %p\n", selector);
+    } else {
+        s72_error("Selector must be an atom (for M0/M1)");
         return S72_NIL;
     }
-    printf("DEBUG: Selector is confirmed to be a symbol\n");
-
-    printf("DEBUG: About to call s72_symbol_oop\n");
-    oop selector = s72_symbol_oop(selector_val);
-    printf("DEBUG: s72_symbol_oop returned %p\n", selector);
 
     // Evaluate arguments
     int argc = node->data.list.count - 2;

@@ -19,15 +19,8 @@ struct t__object {
     };
 };
 
-// Forward declarations for libid functions not in headers
+// Forward declaration for libid initialization
 struct __libid *_libid_init(int *argcp, char ***argvp, char ***envp);
-oop _libid_intern(const char *string);
-oop _libid_proto(oop base);
-oop _libid_alloc(oop type, size_t size);
-void _libid_method(oop type, oop selector, _imp_t method);
-struct __closure *_libid_bind(oop selector, oop receiver);
-_imp_t _libid_bindv(struct __send *send);
-oop _sendv(oop selector, int argc, ...);
 
 // Forward declarations
 typedef struct S72Object S72Object;
@@ -52,7 +45,7 @@ typedef enum {
 } S72Type;
 
 // Global libid instance
-extern struct __libid _libid;
+extern struct __libid *_libid;
 
 // Global selectors (interned once)
 extern oop SEL_PLUS;
@@ -112,9 +105,11 @@ char *s72_value_to_string(S72Value val);
 void s72_error(const char *fmt, ...);
 void s72_type_error(const char *expected, S72Value got);
 
-// Memory management helpers
-#define S72_ALLOC(type, size) _libid_alloc(type, size)
-#define S72_INTERN(str) _libid_intern(str)
+// Memory management helpers - use _libid pointer members
+#define S72_ALLOC(type, size) _libid->alloc(type, size)
+#define S72_INTERN(str) _libid->intern(str)
+#define S72_PROTO(base) _libid->proto(base)
+#define S72_METHOD(type, sel, meth) _libid->method(type, sel, (_imp_t)meth)
 
 // Dispatch helpers using enhanced libid macros
 #define S72_SEND0(sel, rcv) _sendv0(sel, (rcv).obj)

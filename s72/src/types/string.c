@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <string.h>
 
+// Need access to _libid
+extern struct __libid *_libid;
+
 // Global vtable for strings
 extern oop s72_string_vtable;
 
@@ -14,12 +17,12 @@ void s72_string_init(void) {
     }
 
     // Install native methods
-    _libid_method(s72_string_vtable, SEL_PRINT, (_imp_t)s72_string_print);
-    _libid_method(s72_string_vtable, SEL_EQUALS, (_imp_t)s72_string_equals);
+    S72_METHOD(s72_string_vtable, SEL_PRINT, s72_string_print);
+    S72_METHOD(s72_string_vtable, SEL_EQUALS, s72_string_equals);
 
     // Install length method
-    oop sel_length = S72_INTERN("length");
-    _libid_method(s72_string_vtable, sel_length, (_imp_t)s72_string_length_method);
+    oop sel_length = _libid->intern("length");
+    S72_METHOD(s72_string_vtable, sel_length, s72_string_length_method);
 }
 
 // String creation and testing
@@ -36,8 +39,7 @@ S72Value s72_string_new_with_length(const char *str, size_t length) {
         return S72_NIL;
     }
 
-    extern oop s72_string_proto;
-    oop str_oop = S72_ALLOC(s72_string_proto, sizeof(S72String));
+    oop str_oop = S72_ALLOC(s72_string_vtable, sizeof(S72String));
     if (!str_oop) {
         s72_error("Failed to allocate string");
         return S72_NIL;
@@ -62,9 +64,21 @@ S72Value s72_string_new_with_length(const char *str, size_t length) {
 bool s72_is_string(S72Value val) {
     if (s72_is_nil(val)) return false;
 
-    // Check if the object's vtable matches string vtable
-    oop vtable = val.obj->_vtable[-1];
-    return vtable == s72_string_vtable;
+    // Check if object has the string vtable
+    if (!val.obj) return false;
+
+    // Get the vtable from the libid object (libid stores vtable at position -1)
+    oop *vtable_ptr = (oop *)val.obj;
+    oop obj_vtable = vtable_ptr[-1];
+
+    // Compare with string vtable - s72_string_vtable is a prototype, so get its actual vtable
+    oop expected_vtable = s72_string_vtable->_vtable[-1];
+    if (obj_vtable == expected_vtable) {
+        return true;
+    }
+
+    // For M0 debugging only - don't use heuristics as they cause false positives
+    return false;
 }
 
 const char *s72_string_data(S72Value val) {

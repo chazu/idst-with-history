@@ -12,7 +12,7 @@
 #include <math.h>
 
 // Global libid instance
-struct __libid _libid;
+struct __libid *_libid;
 
 // Global selectors
 oop SEL_PLUS = NULL;
@@ -38,10 +38,7 @@ oop s72_list_vtable = NULL;
 oop s72_block_vtable = NULL;
 oop s72_object_vtable = NULL;
 
-// Global prototype objects (for allocation)
-oop s72_number_proto = NULL;
-oop s72_string_proto = NULL;
-oop s72_symbol_proto = NULL;
+// Global prototype objects - no longer needed, using vtables directly
 
 // Forward declarations
 static void s72_create_vtables(void);
@@ -125,6 +122,8 @@ void s72_print_value(S72Value val) {
         printf("nil");
     } else if (s72_is_boolean(val)) {
         printf("%s", s72_as_boolean(val) ? "true" : "false");
+    } else if (s72_is_string(val)) {
+        printf("\"%s\"", s72_as_string(val));
     } else if (s72_is_number(val)) {
         // For M0, print numbers directly without message sending
         double num = s72_as_number(val);
@@ -133,8 +132,6 @@ void s72_print_value(S72Value val) {
         } else {
             printf("%.15g", num);
         }
-    } else if (s72_is_string(val)) {
-        printf("\"%s\"", s72_as_string(val));
     } else if (s72_is_symbol(val)) {
         printf("'%s", s72_as_symbol(val));
     } else {
@@ -170,11 +167,10 @@ char *s72_value_to_string(S72Value val) {
 // Initialization
 void s72_init(int *argc, char ***argv, char ***envp) {
     // Initialize libid
-    struct __libid *libid = _libid_init(argc, argv, envp);
-    if (!libid) {
+    _libid = _libid_init(argc, argv, envp);
+    if (!_libid) {
         s72_error("Failed to initialize libid");
     }
-    _libid = *libid;
 
     // Create vtables
     s72_create_vtables();
@@ -207,31 +203,21 @@ void s72_shutdown(void) {
 // Create vtables for each type
 static void s72_create_vtables(void) {
     // Create base object vtable
-    s72_object_vtable = _libid_proto(_libid._object);
+    s72_object_vtable = S72_PROTO(_libid->_object);
     if (!s72_object_vtable) {
         s72_error("Failed to create object vtable");
     }
 
     // Create type-specific vtables
-    s72_nil_vtable = _libid_proto(s72_object_vtable);
-    s72_boolean_vtable = _libid_proto(s72_object_vtable);
-    s72_number_vtable = _libid_proto(s72_object_vtable);
-    s72_string_vtable = _libid_proto(s72_object_vtable);
-    s72_symbol_vtable = _libid_proto(s72_object_vtable);
-    s72_list_vtable = _libid_proto(s72_object_vtable);
-    s72_block_vtable = _libid_proto(s72_object_vtable);
+    s72_nil_vtable = S72_PROTO(s72_object_vtable);
+    s72_boolean_vtable = S72_PROTO(s72_object_vtable);
+    s72_number_vtable = S72_PROTO(s72_object_vtable);
+    s72_string_vtable = S72_PROTO(s72_object_vtable);
+    s72_symbol_vtable = S72_PROTO(s72_object_vtable);
+    s72_list_vtable = S72_PROTO(s72_object_vtable);
+    s72_block_vtable = S72_PROTO(s72_object_vtable);
 
-    // Create prototype objects for allocation
-    s72_number_proto = _libid_alloc(s72_number_vtable, 0);
-    s72_string_proto = _libid_alloc(s72_string_vtable, 0);
-    s72_symbol_proto = _libid_alloc(s72_symbol_vtable, 0);
-
-    // Update vtables to match what libid actually creates
-    s72_number_vtable = s72_number_proto->_vtable[-1];
-    s72_string_vtable = s72_string_proto->_vtable[-1];
-    s72_symbol_vtable = s72_symbol_proto->_vtable[-1];
-
-
+    // No need for prototype objects - we allocate directly with vtables
 
     if (!s72_nil_vtable || !s72_boolean_vtable || !s72_number_vtable ||
         !s72_string_vtable || !s72_symbol_vtable || !s72_list_vtable ||

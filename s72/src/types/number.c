@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <math.h>
 
+// Need access to _libid
+extern struct __libid *_libid;
+
 // Global vtable for numbers
 extern oop s72_number_vtable;
 
@@ -12,31 +15,40 @@ void s72_number_init(void) {
         return;
     }
 
-    // Install native methods on the prototype object (not the vtable directly)
-    extern oop s72_number_proto;
-    _libid_method(s72_number_proto, SEL_PLUS, (_imp_t)s72_number_add);
-    _libid_method(s72_number_proto, SEL_MINUS, (_imp_t)s72_number_subtract);
-    _libid_method(s72_number_proto, SEL_MULTIPLY, (_imp_t)s72_number_multiply);
-    _libid_method(s72_number_proto, SEL_DIVIDE, (_imp_t)s72_number_divide);
-    _libid_method(s72_number_proto, SEL_EQUALS, (_imp_t)s72_number_equals);
-    _libid_method(s72_number_proto, SEL_PRINT, (_imp_t)s72_number_print);
+    // Install native methods on the vtable
+    S72_METHOD(s72_number_vtable, SEL_PLUS, s72_number_add);
+    S72_METHOD(s72_number_vtable, SEL_MINUS, s72_number_subtract);
+    S72_METHOD(s72_number_vtable, SEL_MULTIPLY, s72_number_multiply);
+    S72_METHOD(s72_number_vtable, SEL_DIVIDE, s72_number_divide);
+    S72_METHOD(s72_number_vtable, SEL_EQUALS, s72_number_equals);
+    S72_METHOD(s72_number_vtable, SEL_PRINT, s72_number_print);
 
-    printf("DEBUG: Installed methods on number proto %p (vtable %p)\n",
-           s72_number_proto, s72_number_vtable);
+    printf("DEBUG: Installed methods on number vtable %p\n", s72_number_vtable);
 }
 
 // Number creation and testing
 S72Value s72_number_new(double value) {
-    // Use the prototype object for allocation
-    extern oop s72_number_proto;
-    oop num_oop = S72_ALLOC(s72_number_proto, sizeof(S72Number));
+    printf("DEBUG: s72_number_new - s72_number_vtable=%p\n", s72_number_vtable);
+
+    // Allocate using the number vtable
+    oop num_oop = S72_ALLOC(s72_number_vtable, sizeof(S72Number));
     if (!num_oop) {
         s72_error("Failed to allocate number");
         return S72_NIL;
     }
 
+    printf("DEBUG: Allocated number object at %p\n", num_oop);
+
+    // Check the vtable that was set (libid stores vtable at position -1)
+    oop *vtable_ptr = (oop *)num_oop;
+    oop obj_vtable = vtable_ptr[-1];
+    oop expected_vtable = s72_number_vtable->_vtable[-1];
+    printf("DEBUG: Object's vtable is %p (expected %p)\n", obj_vtable, expected_vtable);
+
     S72Number *num = (S72Number *)num_oop;
     num->value = value;
+
+    printf("DEBUG: Set number value to %f\n", value);
 
     S72Value result = {num_oop};
     return result;
@@ -45,9 +57,21 @@ S72Value s72_number_new(double value) {
 bool s72_is_number(S72Value val) {
     if (s72_is_nil(val)) return false;
 
-    // Check if the object's vtable matches number vtable
-    oop vtable = val.obj->_vtable[-1];
-    return vtable == s72_number_vtable;
+    // Check if object has the number vtable
+    if (!val.obj) return false;
+
+    // Get the vtable from the libid object (libid stores vtable at position -1)
+    oop *vtable_ptr = (oop *)val.obj;
+    oop obj_vtable = vtable_ptr[-1];
+
+    // Compare with number vtable - s72_number_vtable is a prototype, so get its actual vtable
+    oop expected_vtable = s72_number_vtable->_vtable[-1];
+    if (obj_vtable == expected_vtable) {
+        return true;
+    }
+
+    // For M0 debugging only - don't use heuristics as they cause false positives
+    return false;
 }
 
 double s72_number_value(S72Value val) {
