@@ -1,0 +1,47 @@
+; Test M4 startup file loading and standard library functions
+
+; Test that standard library functions are available
+(show: "Testing M4 standard library functions...")
+
+; Test def: function
+(def testVar: 42)
+(show: "def: function works")
+
+; Test show: function (should be available from init.s72)
+(show: "show: function works")
+
+; Test println: function
+(println: "println: function works")
+
+; Test not: function
+(show: (not: true))
+(show: (not: false))
+
+; Test and: function  
+(show: (and: true true))
+(show: (and: true false))
+(show: (and: false true))
+(show: (and: false false))
+
+; Test or: function
+(show: (or: true true))
+(show: (or: true false))
+(show: (or: false true))
+(show: (or: false false))
+
+; Test mathematical functions
+(show: (abs: -5))
+(show: (abs: 5))
+(show: (min: 3 7))
+(show: (max: 3 7))
+(show: (square: 4))
+
+; Test assert: function
+(assert: true)
+(assert: (3 + 4 = 7))
+
+; Test with lists if available
+; (show: "Testing list functions...")
+; ((nil cons: 1 cons: 2 cons: 3) each: [ :x (show: x) ])
+
+(show: "M4 startup tests completed!")

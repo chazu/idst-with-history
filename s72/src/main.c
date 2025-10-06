@@ -2,6 +2,7 @@
 #include "reader.h"
 #include "eval.h"
 #include "object.h"
+#include "snapshot.h"
 #include "types/number.h"
 #include "types/string.h"
 #include "types/symbol.h"
@@ -274,11 +275,63 @@ static void s72_install_methods(void) {
     // This is called after all type init functions
 }
 
+// Load and evaluate startup file
+static bool s72_load_startup_file(const char *filename) {
+    printf("Loading startup file: %s\n", filename);
+
+    // Check if file exists
+    FILE *test_file = fopen(filename, "r");
+    if (!test_file) {
+        printf("Warning: Startup file not found: %s\n", filename);
+        return false;
+    }
+    fclose(test_file);
+
+    // Read and parse the file
+    ASTNode *ast = s72_read_file(filename);
+    if (!ast) {
+        printf("Error: Failed to parse startup file: %s\n", filename);
+        return false;
+    }
+
+    // Evaluate the startup file
+    S72Value result = s72_eval(ast, s72_global_env);
+
+    // Check if evaluation was successful
+    if (s72_is_nil(result)) {
+        printf("Warning: Startup file evaluation returned nil\n");
+    } else {
+        printf("Startup file loaded successfully\n");
+    }
+
+    // Cleanup
+    ast_free(ast);
+    return true;
+}
+
 // Print startup banner
 static void s72_print_banner(void) {
-    printf("S72 Interpreter v0.1 (M0 - Skeleton)\n");
+    printf("S72 Interpreter v0.1 (M4 - Image Persistence & Standard Library)\n");
     printf("Type expressions to evaluate, or 'quit' to exit.\n");
-    printf("Examples: 42, \"hello\", 'symbol, (3 + 4)\n\n");
+    printf("Examples: 42, \"hello\", 'symbol, (3 + 4)\n");
+    printf("Commands: :save <file>, :load <file>, :help\n\n");
+}
+
+// Print help message
+static void s72_print_help(void) {
+    printf("S72 Interpreter Commands:\n");
+    printf("  :help          - Show this help message\n");
+    printf("  :save <file>   - Save current session to image file\n");
+    printf("  :load <file>   - Load session from image file\n");
+    printf("  :quit, :exit   - Exit the interpreter\n");
+    printf("  quit, exit     - Exit the interpreter\n");
+    printf("\nExamples:\n");
+    printf("  42             - Evaluate number literal\n");
+    printf("  \"hello\"        - Evaluate string literal\n");
+    printf("  'symbol        - Evaluate symbol literal\n");
+    printf("  (3 + 4)        - Evaluate arithmetic expression\n");
+    printf("  (show: \"hi\")    - Use standard library function\n");
+    printf("\n");
 }
 
 // REPL implementation
@@ -303,10 +356,49 @@ static void s72_repl(void) {
         }
         
         // Check for quit command
-        if (strcmp(input, "quit") == 0 || strcmp(input, "exit") == 0) {
+        if (strcmp(input, "quit") == 0 || strcmp(input, "exit") == 0 ||
+            strcmp(input, ":quit") == 0 || strcmp(input, ":exit") == 0) {
             break;
         }
-        
+
+        // Check for help command
+        if (strcmp(input, ":help") == 0 || strcmp(input, "help") == 0) {
+            s72_print_help();
+            continue;
+        }
+
+        // Check for save command
+        if (strncmp(input, ":save ", 6) == 0) {
+            const char *filename = input + 6;
+            while (*filename == ' ') filename++; // Skip spaces
+            if (*filename) {
+                if (s72_snapshot_save(filename)) {
+                    printf("Session saved to %s\n", filename);
+                } else {
+                    printf("Failed to save session to %s\n", filename);
+                }
+            } else {
+                printf("Usage: :save <filename>\n");
+            }
+            continue;
+        }
+
+        // Check for load command
+        if (strncmp(input, ":load ", 6) == 0) {
+            const char *filename = input + 6;
+            while (*filename == ' ') filename++; // Skip spaces
+            if (*filename) {
+                if (s72_snapshot_load(filename)) {
+                    printf("Session loaded from %s\n", filename);
+                } else {
+                    printf("Failed to load session from %s\n", filename);
+                }
+            } else {
+                printf("Usage: :load <filename>\n");
+            }
+            continue;
+        }
+
         // Skip empty lines
         if (strlen(input) == 0) {
             continue;
@@ -342,16 +434,74 @@ static void s72_repl(void) {
     printf("Goodbye!\n");
 }
 
+// Print usage information
+static void s72_print_usage(const char *program_name) {
+    printf("Usage: %s [options]\n", program_name);
+    printf("Options:\n");
+    printf("  -h, --help           Show this help message\n");
+    printf("  -l, --load <file>    Load image file at startup\n");
+    printf("  -s, --save <file>    Save image file at exit\n");
+    printf("  --no-init            Skip loading lang/init.s72\n");
+    printf("  --version            Show version information\n");
+    printf("\n");
+}
+
 // Main function
 int main(int argc, char **argv, char **envp) {
+    const char *load_file = NULL;
+    const char *save_file = NULL;
+    bool load_init = true;
+
+    // Parse command-line arguments
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            s72_print_usage(argv[0]);
+            return 0;
+        } else if (strcmp(argv[i], "--version") == 0) {
+            printf("S72 Interpreter v0.1 (M4 - Image Persistence & Standard Library)\n");
+            return 0;
+        } else if (strcmp(argv[i], "--no-init") == 0) {
+            load_init = false;
+        } else if ((strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "--load") == 0) && i + 1 < argc) {
+            load_file = argv[++i];
+        } else if ((strcmp(argv[i], "-s") == 0 || strcmp(argv[i], "--save") == 0) && i + 1 < argc) {
+            save_file = argv[++i];
+        } else {
+            printf("Unknown option: %s\n", argv[i]);
+            s72_print_usage(argv[0]);
+            return 1;
+        }
+    }
+
     // Initialize S72
     s72_init(&argc, &argv, &envp);
-    
+
+    // Load image file if specified
+    if (load_file) {
+        printf("Loading image file: %s\n", load_file);
+        if (!s72_snapshot_load(load_file)) {
+            printf("Warning: Failed to load image file\n");
+        }
+    }
+
+    // Load startup file (M4 feature) unless disabled
+    if (load_init) {
+        s72_load_startup_file("lang/init.s72");
+    }
+
     // Run REPL
     s72_repl();
-    
+
+    // Save image file if specified
+    if (save_file) {
+        printf("Saving image file: %s\n", save_file);
+        if (!s72_snapshot_save(save_file)) {
+            printf("Warning: Failed to save image file\n");
+        }
+    }
+
     // Shutdown
     s72_shutdown();
-    
+
     return 0;
 }

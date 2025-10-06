@@ -1,0 +1,220 @@
+; S72 Standard Library - Initialization File
+; This file is loaded automatically at startup to define convenience functions
+; and standard library functionality in the S72 language itself.
+
+; Print startup message
+(Transcript print: "S72 Standard Library Loading...")
+(Transcript cr)
+
+; ============================================================================
+; Core Language Extensions
+; ============================================================================
+
+; Define 'def' for global variable definition
+; Usage: (def variableName value)
+(def def: [ :name :value
+  (Transcript print: "Defining: ")
+  (Transcript print: name)
+  (Transcript print: " = ")
+  (Transcript print: value)
+  (Transcript cr)
+  ; TODO: Implement actual global binding
+  value
+])
+
+; Define 'let' for local variable binding
+; Usage: (let variableName value)
+(def let: [ :name :value
+  ; TODO: Implement local binding
+  value
+])
+
+; Define 'set' for variable assignment
+; Usage: (set variableName newValue)
+(def set: [ :name :value
+  ; TODO: Implement variable assignment
+  value
+])
+
+; ============================================================================
+; Boolean and Logic Extensions
+; ============================================================================
+
+; Define 'not:' for boolean negation
+(def not: [ :b 
+  (b ifTrue: [ false ] ifFalse: [ true ])
+])
+
+; Define 'and:' for boolean conjunction
+(def and: [ :a :b
+  (a ifTrue: [ b ] ifFalse: [ false ])
+])
+
+; Define 'or:' for boolean disjunction  
+(def or: [ :a :b
+  (a ifTrue: [ true ] ifFalse: [ b ])
+])
+
+; ============================================================================
+; Control Flow Extensions
+; ============================================================================
+
+; Define 'whileTrue:' for loops
+; Usage: (whileTrue: conditionBlock bodyBlock)
+(def whileTrue: [ :cond :body
+  ([ (cond value) ] whileTrue: [ (body value) ])
+])
+
+; Define 'times:' for iteration
+; Usage: (5 times: [ :i (Transcript print: i) (Transcript cr) ])
+(def times: [ :n :block
+  (def i: 0)
+  (whileTrue: [ (i < n) ] [
+    (block value: i)
+    (set i: (i + 1))
+  ])
+])
+
+; Define 'repeat:' for simple repetition
+; Usage: (repeat: 5 [ (Transcript print: "Hello") (Transcript cr) ])
+(def repeat: [ :n :block
+  (times: n [ :i (block value) ])
+])
+
+; ============================================================================
+; Collection Extensions
+; ============================================================================
+
+; Define 'map:' for list transformation
+; Usage: ((List cons: 1 cons: 2 cons: 3) map: [ :x (x * 2) ])
+(def map: [ :list :block
+  (list isEmpty 
+    ifTrue: [ nil ]
+    ifFalse: [
+      ((block value: (list first)) cons: ((list rest) map: block))
+    ]
+  )
+])
+
+; Define 'select:' for list filtering
+; Usage: ((List cons: 1 cons: 2 cons: 3) select: [ :x (x > 1) ])
+(def select: [ :list :block
+  (list isEmpty
+    ifTrue: [ nil ]
+    ifFalse: [
+      ((block value: (list first))
+        ifTrue: [ ((list first) cons: ((list rest) select: block)) ]
+        ifFalse: [ ((list rest) select: block) ]
+      )
+    ]
+  )
+])
+
+; Define 'each:' for list iteration
+; Usage: ((List cons: 1 cons: 2 cons: 3) each: [ :x (Transcript print: x) (Transcript cr) ])
+(def each: [ :list :block
+  (list isEmpty
+    ifFalse: [
+      (block value: (list first))
+      ((list rest) each: block)
+    ]
+  )
+])
+
+; Define 'reduce:' for list folding
+; Usage: ((List cons: 1 cons: 2 cons: 3) reduce: 0 [ :acc :x (acc + x) ])
+(def reduce: [ :list :initial :block
+  (list isEmpty
+    ifTrue: [ initial ]
+    ifFalse: [
+      ((list rest) reduce: (block value: initial value: (list first)) value: block)
+    ]
+  )
+])
+
+; ============================================================================
+; Utility Functions
+; ============================================================================
+
+; Define 'show:' as alias for print: + cr
+(def show: [ :obj
+  (Transcript print: obj)
+  (Transcript cr)
+])
+
+; Define 'println:' as another alias
+(def println: [ :obj
+  (show: obj)
+])
+
+; Define 'assert:' for testing
+(def assert: [ :condition
+  (condition 
+    ifFalse: [
+      (Transcript print: "ASSERTION FAILED!")
+      (Transcript cr)
+    ]
+  )
+])
+
+; Define 'assert:message:' for testing with messages
+(def assert:message: [ :condition :message
+  (condition 
+    ifFalse: [
+      (Transcript print: "ASSERTION FAILED: ")
+      (Transcript print: message)
+      (Transcript cr)
+    ]
+  )
+])
+
+; ============================================================================
+; Mathematical Extensions
+; ============================================================================
+
+; Define 'abs:' for absolute value
+(def abs: [ :n
+  (n < 0 ifTrue: [ (0 - n) ] ifFalse: [ n ])
+])
+
+; Define 'min:' for minimum of two values
+(def min: [ :a :b
+  (a < b ifTrue: [ a ] ifFalse: [ b ])
+])
+
+; Define 'max:' for maximum of two values
+(def max: [ :a :b
+  (a > b ifTrue: [ a ] ifFalse: [ b ])
+])
+
+; Define 'square:' for squaring
+(def square: [ :n
+  (n * n)
+])
+
+; ============================================================================
+; String Extensions
+; ============================================================================
+
+; Define 'isEmpty:' for strings
+(def isEmpty: [ :str
+  ; TODO: Implement string length check
+  false
+])
+
+; ============================================================================
+; Initialization Complete
+; ============================================================================
+
+(Transcript print: "S72 Standard Library Loaded Successfully!")
+(Transcript cr)
+(Transcript print: "Available functions: def:, let:, set:, not:, and:, or:, whileTrue:, times:, repeat:")
+(Transcript cr)
+(Transcript print: "                     map:, select:, each:, reduce:, show:, println:, assert:")
+(Transcript cr)
+(Transcript print: "                     abs:, min:, max:, square:")
+(Transcript cr)
+(Transcript cr)
+
+; Return success indicator
+true

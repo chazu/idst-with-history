@@ -1,0 +1,19 @@
+; Test M4 image persistence functionality
+
+; Test basic image operations
+(show: "Testing M4 image persistence...")
+
+; Define some test data
+(def imageTestVar: "Hello from image test")
+(def imageTestNumber: 123)
+
+; Show the values
+(show: imageTestVar)
+(show: imageTestNumber)
+
+; Test that we can create and manipulate objects
+(def testList: (nil cons: 1 cons: 2 cons: 3))
+(show: "Test list created")
+(show: (testList length))
+
+(show: "M4 image tests completed!")

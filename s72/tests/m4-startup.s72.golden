@@ -1,0 +1,20 @@
+Testing M4 standard library functions...
+def: function works
+show: function works
+println: function works
+false
+true
+true
+false
+false
+false
+true
+true
+true
+false
+5
+5
+3
+7
+16
+M4 startup tests completed!

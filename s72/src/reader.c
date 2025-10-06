@@ -355,10 +355,49 @@ ASTNode *reader_parse_block(Reader *reader) {
 ASTNode *s72_read_string(const char *input) {
     Reader *reader = reader_create(input);
     if (!reader) return NULL;
-    
+
     ASTNode *result = reader_parse_expression(reader);
     reader_destroy(reader);
-    
+
+    return result;
+}
+
+ASTNode *s72_read_file(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        s72_error("Cannot open file: %s", filename);
+        return NULL;
+    }
+
+    // Get file size
+    fseek(file, 0, SEEK_END);
+    long size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    // Allocate buffer
+    char *content = malloc(size + 1);
+    if (!content) {
+        fclose(file);
+        s72_error("Out of memory reading file: %s", filename);
+        return NULL;
+    }
+
+    // Read file content
+    size_t bytes_read = fread(content, 1, size, file);
+    fclose(file);
+
+    if (bytes_read != size) {
+        free(content);
+        s72_error("Error reading file: %s", filename);
+        return NULL;
+    }
+
+    content[size] = '\0';
+
+    // Parse content
+    ASTNode *result = s72_read_string(content);
+    free(content);
+
     return result;
 }
 

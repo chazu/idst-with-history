@@ -51,6 +51,7 @@ ASTNode *reader_parse_block(Reader *reader);
 
 // High-level interface
 ASTNode *s72_read_string(const char *input);
+ASTNode *s72_read_file(const char *filename);
 
 // Error handling
 void reader_error(Reader *reader, const char *message);

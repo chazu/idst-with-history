@@ -8,8 +8,8 @@
 #include <stdbool.h>
 
 // Include enhanced libid
-#include <id/id.h>
-#include <id/libid_enhanced.h>
+#include "id.h"
+#include "libid_enhanced.h"
 
 // Complete libid object structure (from libid.c)
 struct t__object {

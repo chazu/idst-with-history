@@ -10,12 +10,13 @@ LIBS = -lm
 # Enhanced libid object file
 LIBID_OBJ = ../object/stage2/libid.o
 
-# Source files for M3
+# Source files for M4
 SOURCES = src/main.c \
           src/reader.c \
           src/ast.c \
           src/eval.c \
           src/object.c \
+          src/snapshot.c \
           src/types/number.c \
           src/types/string.c \
           src/types/symbol.c \
