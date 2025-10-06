@@ -129,14 +129,21 @@ void s72_symbol_intern_selectors(void) {
     SEL_MULTIPLY = _libid->intern("*");
     SEL_DIVIDE = _libid->intern("/");
     SEL_EQUALS = _libid->intern("=");
+    SEL_LESS_THAN = _libid->intern("<");
+    SEL_GREATER_THAN = _libid->intern(">");
+    SEL_LESS_EQUAL = _libid->intern("<=");
+    SEL_GREATER_EQUAL = _libid->intern(">=");
     SEL_PRINT = _libid->intern("print");
     SEL_VALUE = _libid->intern("value");
+    SEL_DOES_NOT_UNDERSTAND = _libid->intern("doesNotUnderstand:");
 
     printf("DEBUG: Interned selectors - PLUS=%p, MINUS=%p, MULTIPLY=%p\n",
            SEL_PLUS, SEL_MINUS, SEL_MULTIPLY);
 
     if (!SEL_PLUS || !SEL_MINUS || !SEL_MULTIPLY || !SEL_DIVIDE ||
-        !SEL_EQUALS || !SEL_PRINT || !SEL_VALUE) {
+        !SEL_EQUALS || !SEL_LESS_THAN || !SEL_GREATER_THAN ||
+        !SEL_LESS_EQUAL || !SEL_GREATER_EQUAL || !SEL_PRINT || !SEL_VALUE ||
+        !SEL_DOES_NOT_UNDERSTAND) {
         s72_error("Failed to intern core selectors");
     }
 }

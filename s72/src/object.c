@@ -1,6 +1,7 @@
 #include "object.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 // Need access to _libid
 extern struct __libid *_libid;
@@ -15,6 +16,13 @@ void s72_object_init(void) {
         // This will be properly initialized in main.c with libid
         s72_error("Object system not properly initialized");
     }
+
+    // Install base object methods
+    S72_METHOD(s72_object_vtable, SEL_DOES_NOT_UNDERSTAND, s72_object_does_not_understand);
+
+    // Add a test method to demonstrate inheritance
+    oop sel_class = _libid->intern("class");
+    S72_METHOD(s72_object_vtable, sel_class, s72_object_class);
 }
 
 // Object creation
@@ -88,78 +96,37 @@ S72Value s72_object_send(S72Value receiver, oop selector, int argc, S72Value *ar
         s72_error("Cannot send message to nil");
         return S72_NIL;
     }
-    
-    // For M0, use libid's dispatch directly
-    // Convert S72Value array to oop array
-    oop *libid_args = NULL;
-    if (argc > 0) {
-        libid_args = malloc(argc * sizeof(oop));
-        for (int i = 0; i < argc; i++) {
-            libid_args[i] = argv[i].obj;
-        }
-    }
-    
-    // Use libid's public API correctly
-    oop result_oop = NULL;
 
     printf("DEBUG: About to dispatch selector=%p to receiver=%p, argc=%d\n",
            selector, receiver.obj, argc);
 
-    // Use libid's bind function to find the method
-    printf("DEBUG: Calling _libid->bind(%p, %p)\n", selector, receiver.obj);
-    struct __closure *closure = _libid->bind(selector, receiver.obj);
-    printf("DEBUG: _libid->bind returned %p\n", closure);
+    // Use enhanced libid dispatch macros directly
+    oop result_oop = NULL;
 
-    if (!closure) {
-        printf("DEBUG: No closure found for selector\n");
-        s72_error("Method not found");
-        if (libid_args) free(libid_args);
-        return S72_NIL;
-    }
-
-    printf("DEBUG: closure->method = %p\n", closure->method);
-    if (!closure->method) {
-        printf("DEBUG: Closure has no method\n");
-        s72_error("Method not found");
-        if (libid_args) free(libid_args);
-        return S72_NIL;
-    }
-
-    printf("DEBUG: Found method %p\n", closure->method);
-
-    // Create a proper send structure for the method call
-    struct __send send_struct = {
-        .selector = selector,
-        .nArgs = argc + 1,  // +1 for receiver
-        .receiver = receiver.obj,
-        .state = NULL,
-        .closure = closure
-    };
-
-    // Call the method with the proper signature
     switch (argc) {
         case 0:
-            result_oop = closure->method(&send_struct, receiver.obj, receiver.obj);
+            printf("DEBUG: Using _send0\n");
+            result_oop = _send0(selector, receiver.obj);
             break;
         case 1:
-            result_oop = closure->method(&send_struct, receiver.obj, receiver.obj, libid_args[0]);
+            printf("DEBUG: Using _send1 with arg=%p\n", argv[0].obj);
+            result_oop = _send1(selector, receiver.obj, argv[0].obj);
             break;
         case 2:
-            result_oop = closure->method(&send_struct, receiver.obj, receiver.obj, libid_args[0], libid_args[1]);
+            printf("DEBUG: Using _send2 with args=%p, %p\n", argv[0].obj, argv[1].obj);
+            result_oop = _send2(selector, receiver.obj, argv[0].obj, argv[1].obj);
             break;
         case 3:
-            result_oop = closure->method(&send_struct, receiver.obj, receiver.obj, libid_args[0], libid_args[1], libid_args[2]);
+            printf("DEBUG: Using _send3 with args=%p, %p, %p\n", argv[0].obj, argv[1].obj, argv[2].obj);
+            result_oop = _send3(selector, receiver.obj, argv[0].obj, argv[1].obj, argv[2].obj);
             break;
         default:
-            s72_error("Too many arguments for message send (max 3 for M1)");
-            if (libid_args) free(libid_args);
+            s72_error("Too many arguments for message send (max 3 for M0)");
             return S72_NIL;
     }
 
     printf("DEBUG: Method returned %p\n", result_oop);
-    
-    if (libid_args) free(libid_args);
-    
+
     S72Value result = {result_oop};
     return result;
 }
@@ -188,4 +155,26 @@ S72Value s72_object_get_parent(S72Value obj) {
 // Object introspection
 bool s72_object_responds_to(S72Value obj, oop selector) {
     return s72_object_lookup_method(obj, selector) != NULL;
+}
+
+// Default doesNotUnderstand: handler
+oop s72_object_does_not_understand(oop closure, oop state, oop receiver, ...) {
+    va_list args;
+    va_start(args, receiver);
+    oop selector = va_arg(args, oop);
+    va_end(args);
+
+    // For now, just print an error message and return nil
+    // TODO: In M2, this should create a proper error message with the selector name
+    printf("ERROR: Object does not understand message\n");
+    s72_error("Message not understood");
+    return NULL;
+}
+
+// Basic class method - returns a string representation of the object's type
+oop s72_object_class(oop closure, oop state, oop receiver) {
+    // For now, just return a simple string
+    // TODO: In M2, this should return a proper Class object
+    printf("Object");
+    return receiver;  // Return self for now
 }

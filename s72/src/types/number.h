@@ -17,19 +17,21 @@ bool s72_is_number(S72Value val);
 double s72_number_value(S72Value val);
 
 // Number arithmetic methods (native implementations)
-oop s72_number_add(struct __send *send, oop self, oop receiver, oop arg);
-oop s72_number_subtract(struct __send *send, oop self, oop receiver, oop arg);
-oop s72_number_multiply(struct __send *send, oop self, oop receiver, oop arg);
-oop s72_number_divide(struct __send *send, oop self, oop receiver, oop arg);
-oop s72_number_equals(struct __send *send, oop self, oop receiver, oop arg);
+// Note: _send1 calls with (oop closure, oop state, oop receiver, ...) - bootstrap calling convention with variadic args
+oop s72_number_add(oop closure, oop state, oop receiver, ...);
+oop s72_number_subtract(oop closure, oop state, oop receiver, ...);
+oop s72_number_multiply(oop closure, oop state, oop receiver, ...);
+oop s72_number_divide(oop closure, oop state, oop receiver, ...);
+oop s72_number_equals(oop closure, oop state, oop receiver, ...);
 
 // Number comparison methods
-oop s72_number_less_than(struct __send *send, oop self, oop receiver, oop arg);
-oop s72_number_greater_than(struct __send *send, oop self, oop receiver, oop arg);
-oop s72_number_less_equal(struct __send *send, oop self, oop receiver, oop arg);
-oop s72_number_greater_equal(struct __send *send, oop self, oop receiver, oop arg);
+oop s72_number_less_than(oop closure, oop state, oop receiver, ...);
+oop s72_number_greater_than(oop closure, oop state, oop receiver, ...);
+oop s72_number_less_equal(oop closure, oop state, oop receiver, ...);
+oop s72_number_greater_equal(oop closure, oop state, oop receiver, ...);
 
 // Number printing
-oop s72_number_print(struct __send *send, oop self, oop receiver);
+// Note: _send0 calls with (oop closure, oop state, oop receiver)
+oop s72_number_print(oop closure, oop state, oop receiver);
 
 #endif // NUMBER_H

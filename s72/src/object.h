@@ -44,4 +44,8 @@ S72Value s72_object_get_parent(S72Value obj);
 // Object introspection
 bool s72_object_responds_to(S72Value obj, oop selector);
 
+// Default methods
+oop s72_object_does_not_understand(oop closure, oop state, oop receiver, ...);
+oop s72_object_class(oop closure, oop state, oop receiver);
+
 #endif // OBJECT_H

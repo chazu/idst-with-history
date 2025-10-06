@@ -20,8 +20,13 @@ oop SEL_MINUS = NULL;
 oop SEL_MULTIPLY = NULL;
 oop SEL_DIVIDE = NULL;
 oop SEL_EQUALS = NULL;
+oop SEL_LESS_THAN = NULL;
+oop SEL_GREATER_THAN = NULL;
+oop SEL_LESS_EQUAL = NULL;
+oop SEL_GREATER_EQUAL = NULL;
 oop SEL_PRINT = NULL;
 oop SEL_VALUE = NULL;
+oop SEL_DOES_NOT_UNDERSTAND = NULL;
 
 // Global singletons
 S72Value S72_NIL;
@@ -292,6 +297,11 @@ static void s72_repl(void) {
         if (!ast) {
             printf("Parse error\n");
             continue;
+        }
+
+        printf("DEBUG: AST type = %d\n", ast->type);
+        if (ast->type == AST_LIST) {
+            printf("DEBUG: List has %d elements\n", ast->data.list.count);
         }
 
         printf("DEBUG: About to evaluate AST\n");

@@ -1,6 +1,8 @@
 #include "number.h"
 #include <stdio.h>
 #include <math.h>
+#include <stdarg.h>
+#include <stdbool.h>
 
 // Need access to _libid
 extern struct __libid *_libid;
@@ -21,6 +23,10 @@ void s72_number_init(void) {
     S72_METHOD(s72_number_vtable, SEL_MULTIPLY, s72_number_multiply);
     S72_METHOD(s72_number_vtable, SEL_DIVIDE, s72_number_divide);
     S72_METHOD(s72_number_vtable, SEL_EQUALS, s72_number_equals);
+    S72_METHOD(s72_number_vtable, SEL_LESS_THAN, s72_number_less_than);
+    S72_METHOD(s72_number_vtable, SEL_GREATER_THAN, s72_number_greater_than);
+    S72_METHOD(s72_number_vtable, SEL_LESS_EQUAL, s72_number_less_equal);
+    S72_METHOD(s72_number_vtable, SEL_GREATER_EQUAL, s72_number_greater_equal);
     S72_METHOD(s72_number_vtable, SEL_PRINT, s72_number_print);
 
     printf("DEBUG: Installed methods on number vtable %p\n", s72_number_vtable);
@@ -86,8 +92,14 @@ double s72_number_value(S72Value val) {
 
 // Number arithmetic methods
 
-oop s72_number_add(struct __send *send, oop self, oop receiver, oop arg) {
-    printf("DEBUG: s72_number_add called - receiver=%p, arg=%p\n", receiver, arg);
+oop s72_number_add(oop closure, oop state, oop receiver, ...) {
+    va_list args;
+    va_start(args, receiver);
+    oop arg = va_arg(args, oop);
+    va_end(args);
+
+    printf("DEBUG: s72_number_add called - closure=%p, state=%p, receiver=%p, arg=%p\n",
+           closure, state, receiver, arg);
 
     if (!arg) {
         printf("ERROR: + requires one argument\n");
@@ -112,187 +124,227 @@ oop s72_number_add(struct __send *send, oop self, oop receiver, oop arg) {
     return result.obj;
 }
 
-oop s72_number_subtract(struct __send *send, oop self, oop receiver, oop arg) {
+oop s72_number_subtract(oop closure, oop state, oop receiver, ...) {
+    va_list args;
+    va_start(args, receiver);
+    oop arg = va_arg(args, oop);
+    va_end(args);
+
     if (!arg) {
         s72_error("- requires one argument");
         return NULL;
     }
-    
+
     S72Value recv_val = {receiver};
     S72Value arg_val = {arg};
-    
+
     if (!s72_is_number(recv_val) || !s72_is_number(arg_val)) {
         s72_error("- requires numeric arguments");
         return NULL;
     }
-    
+
     double a = s72_number_value(recv_val);
     double b = s72_number_value(arg_val);
-    
+
     S72Value result = s72_number_new(a - b);
     return result.obj;
 }
 
-oop s72_number_multiply(struct __send *send, oop self, oop receiver, oop arg) {
+oop s72_number_multiply(oop closure, oop state, oop receiver, ...) {
+    va_list args;
+    va_start(args, receiver);
+    oop arg = va_arg(args, oop);
+    va_end(args);
+
     if (!arg) {
         s72_error("* requires one argument");
         return NULL;
     }
-    
+
     S72Value recv_val = {receiver};
     S72Value arg_val = {arg};
-    
+
     if (!s72_is_number(recv_val) || !s72_is_number(arg_val)) {
         s72_error("* requires numeric arguments");
         return NULL;
     }
-    
+
     double a = s72_number_value(recv_val);
     double b = s72_number_value(arg_val);
-    
+
     S72Value result = s72_number_new(a * b);
     return result.obj;
 }
 
-oop s72_number_divide(struct __send *send, oop self, oop receiver, oop arg) {
+oop s72_number_divide(oop closure, oop state, oop receiver, ...) {
+    va_list args;
+    va_start(args, receiver);
+    oop arg = va_arg(args, oop);
+    va_end(args);
+
     if (!arg) {
         s72_error("/ requires one argument");
         return NULL;
     }
-    
+
     S72Value recv_val = {receiver};
     S72Value arg_val = {arg};
-    
+
     if (!s72_is_number(recv_val) || !s72_is_number(arg_val)) {
         s72_error("/ requires numeric arguments");
         return NULL;
     }
-    
+
     double a = s72_number_value(recv_val);
     double b = s72_number_value(arg_val);
-    
+
     if (b == 0.0) {
         s72_error("Division by zero");
         return NULL;
     }
-    
+
     S72Value result = s72_number_new(a / b);
     return result.obj;
 }
 
-oop s72_number_equals(struct __send *send, oop self, oop receiver, oop arg) {
+oop s72_number_equals(oop closure, oop state, oop receiver, ...) {
+    va_list args;
+    va_start(args, receiver);
+    oop arg = va_arg(args, oop);
+    va_end(args);
+
     if (!arg) {
         s72_error("= requires one argument");
         return NULL;
     }
-    
+
     S72Value recv_val = {receiver};
     S72Value arg_val = {arg};
-    
+
     if (!s72_is_number(recv_val) || !s72_is_number(arg_val)) {
         return S72_FALSE.obj;  // Different types are not equal
     }
-    
+
     double a = s72_number_value(recv_val);
     double b = s72_number_value(arg_val);
-    
+
     // Use epsilon comparison for floating point
     bool equal = fabs(a - b) < 1e-15;
     return equal ? S72_TRUE.obj : S72_FALSE.obj;
 }
 
 // Number comparison methods
-oop s72_number_less_than(struct __send *send, oop self, oop receiver, oop arg) {
+oop s72_number_less_than(oop closure, oop state, oop receiver, ...) {
+    va_list args;
+    va_start(args, receiver);
+    oop arg = va_arg(args, oop);
+    va_end(args);
+
     if (!arg) {
         s72_error("< requires one argument");
         return NULL;
     }
-    
+
     S72Value recv_val = {receiver};
     S72Value arg_val = {arg};
-    
+
     if (!s72_is_number(recv_val) || !s72_is_number(arg_val)) {
         s72_error("< requires numeric arguments");
         return NULL;
     }
-    
+
     double a = s72_number_value(recv_val);
     double b = s72_number_value(arg_val);
-    
+
     return (a < b) ? S72_TRUE.obj : S72_FALSE.obj;
 }
 
-oop s72_number_greater_than(struct __send *send, oop self, oop receiver, oop arg) {
+oop s72_number_greater_than(oop closure, oop state, oop receiver, ...) {
+    va_list args;
+    va_start(args, receiver);
+    oop arg = va_arg(args, oop);
+    va_end(args);
+
     if (!arg) {
         s72_error("> requires one argument");
         return NULL;
     }
-    
+
     S72Value recv_val = {receiver};
     S72Value arg_val = {arg};
-    
+
     if (!s72_is_number(recv_val) || !s72_is_number(arg_val)) {
         s72_error("> requires numeric arguments");
         return NULL;
     }
-    
+
     double a = s72_number_value(recv_val);
     double b = s72_number_value(arg_val);
-    
+
     return (a > b) ? S72_TRUE.obj : S72_FALSE.obj;
 }
 
-oop s72_number_less_equal(struct __send *send, oop self, oop receiver, oop arg) {
+oop s72_number_less_equal(oop closure, oop state, oop receiver, ...) {
+    va_list args;
+    va_start(args, receiver);
+    oop arg = va_arg(args, oop);
+    va_end(args);
+
     if (!arg) {
         s72_error("<= requires one argument");
         return NULL;
     }
-    
+
     S72Value recv_val = {receiver};
     S72Value arg_val = {arg};
-    
+
     if (!s72_is_number(recv_val) || !s72_is_number(arg_val)) {
         s72_error("<= requires numeric arguments");
         return NULL;
     }
-    
+
     double a = s72_number_value(recv_val);
     double b = s72_number_value(arg_val);
-    
+
     return (a <= b) ? S72_TRUE.obj : S72_FALSE.obj;
 }
 
-oop s72_number_greater_equal(struct __send *send, oop self, oop receiver, oop arg) {
+oop s72_number_greater_equal(oop closure, oop state, oop receiver, ...) {
+    va_list args;
+    va_start(args, receiver);
+    oop arg = va_arg(args, oop);
+    va_end(args);
+
     if (!arg) {
         s72_error(">= requires one argument");
         return NULL;
     }
-    
+
     S72Value recv_val = {receiver};
     S72Value arg_val = {arg};
-    
+
     if (!s72_is_number(recv_val) || !s72_is_number(arg_val)) {
         s72_error(">= requires numeric arguments");
         return NULL;
     }
-    
+
     double a = s72_number_value(recv_val);
     double b = s72_number_value(arg_val);
-    
+
     return (a >= b) ? S72_TRUE.obj : S72_FALSE.obj;
 }
 
 // Number printing
-oop s72_number_print(struct __send *send, oop self, oop receiver) {
+oop s72_number_print(oop closure, oop state, oop receiver) {
     S72Value recv_val = {receiver};
-    
+
     if (!s72_is_number(recv_val)) {
         s72_error("print called on non-number");
         return NULL;
     }
-    
+
     double value = s72_number_value(recv_val);
-    
+
     // Print the number
     if (value == floor(value) && value >= -1e15 && value <= 1e15) {
         // Print as integer if it's a whole number
@@ -301,6 +353,6 @@ oop s72_number_print(struct __send *send, oop self, oop receiver) {
         // Print as floating point
         printf("%.15g", value);
     }
-    
+
     return receiver;  // Return self
 }

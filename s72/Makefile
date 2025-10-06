@@ -4,7 +4,7 @@
 CC = gcc
 CFLAGS = -std=c11 -O2 -g -Wall -Wextra -Wno-unused-parameter -DNO_GC=1
 INCLUDES = -I../object/stage2/include -I../object/id -Isrc
-LDFLAGS = -L../object/stage2
+LDFLAGS = -L../object/boot
 LIBS = -lm
 
 # Enhanced libid object file

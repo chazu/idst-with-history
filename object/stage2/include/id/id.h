@@ -54,6 +54,7 @@ typedef struct t__object *oop;
 
 struct __send;
 typedef oop (*_imp_t)(oop closure, oop state, oop receiver, ...);
+typedef oop (*_impv_t)(struct __send *send, oop stateful_self, oop self, ...);
 
 
 struct __closure

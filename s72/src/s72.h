@@ -53,8 +53,13 @@ extern oop SEL_MINUS;
 extern oop SEL_MULTIPLY;
 extern oop SEL_DIVIDE;
 extern oop SEL_EQUALS;
+extern oop SEL_LESS_THAN;
+extern oop SEL_GREATER_THAN;
+extern oop SEL_LESS_EQUAL;
+extern oop SEL_GREATER_EQUAL;
 extern oop SEL_PRINT;
 extern oop SEL_VALUE;
+extern oop SEL_DOES_NOT_UNDERSTAND;
 
 // Global singletons
 extern S72Value S72_NIL;
