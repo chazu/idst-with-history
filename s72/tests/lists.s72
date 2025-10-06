@@ -1,0 +1,27 @@
+
+nil
+(nil isEmpty)
+
+
+(nil cons: 1)
+(nil cons: "hello")
+(nil cons: 'symbol)
+
+
+((nil cons: 1) isEmpty)
+((nil cons: 1) first)
+((nil cons: 1) rest)
+
+
+((nil cons: 2) cons: 1)
+(((nil cons: 3) cons: 2) cons: 1)
+
+
+(((nil cons: 3) cons: 2) cons: 1) first
+(((nil cons: 3) cons: 2) cons: 1) rest
+((((nil cons: 3) cons: 2) cons: 1) rest) first
+
+
+(nil length)
+((nil cons: 1) length)
+(((nil cons: 2) cons: 1) length)

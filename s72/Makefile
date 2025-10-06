@@ -10,7 +10,7 @@ LIBS = -lm
 # Enhanced libid object file
 LIBID_OBJ = ../object/stage2/libid.o
 
-# Source files for M0
+# Source files for M3
 SOURCES = src/main.c \
           src/reader.c \
           src/ast.c \
@@ -18,7 +18,11 @@ SOURCES = src/main.c \
           src/object.c \
           src/types/number.c \
           src/types/string.c \
-          src/types/symbol.c
+          src/types/symbol.c \
+          src/types/boolean.c \
+          src/types/block.c \
+          src/types/list.c \
+          src/types/transcript.c
 
 OBJECTS = $(SOURCES:.c=.o)
 TARGET = s72

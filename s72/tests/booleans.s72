@@ -1,0 +1,30 @@
+
+true
+false
+nil
+
+
+(true not)
+(false not)
+(true and: false)
+(true and: true)
+(false and: true)
+(false and: false)
+(true or: false)
+(true or: true)
+(false or: true)
+(false or: false)
+
+
+(true ifTrue: [ 100 ])
+(false ifTrue: [ 200 ])
+(true ifFalse: [ 300 ])
+(false ifFalse: [ 400 ])
+
+
+[ 42 ]
+([ 42 ] value)
+([ (3 + 4) ] value)
+
+
+(true ifTrue: [ (false ifFalse: [ 500 ]) ])

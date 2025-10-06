@@ -5,6 +5,10 @@
 #include "types/number.h"
 #include "types/string.h"
 #include "types/symbol.h"
+#include "types/boolean.h"
+#include "types/block.h"
+#include "types/list.h"
+#include "types/transcript.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +45,7 @@ oop s72_string_vtable = NULL;
 oop s72_symbol_vtable = NULL;
 oop s72_list_vtable = NULL;
 oop s72_block_vtable = NULL;
+oop s72_transcript_vtable = NULL;
 oop s72_object_vtable = NULL;
 
 // Global prototype objects - no longer needed, using vtables directly
@@ -90,14 +95,24 @@ S72Value s72_make_symbol(const char *name) {
     return s72_symbol_new(name);
 }
 
-// Value testing functions
-bool s72_is_nil(S72Value val) {
-    return val.obj == S72_NIL.obj;
+S72Value s72_make_list_empty(void) {
+    return s72_list_empty();
 }
 
-bool s72_is_boolean(S72Value val) {
-    return val.obj == S72_TRUE.obj || val.obj == S72_FALSE.obj;
+S72Value s72_make_list_cons(S72Value first, S72Value rest) {
+    return s72_list_cons(first, rest);
 }
+
+S72Value s72_make_transcript(void) {
+    return s72_transcript_singleton();
+}
+
+// Value testing functions
+bool s72_is_nil(S72Value val) {
+    return val.obj == S72_NIL.obj || val.obj == NULL;
+}
+
+// s72_is_boolean is now defined in types/boolean.c
 
 // Value extraction functions
 bool s72_as_boolean(S72Value val) {
@@ -137,6 +152,9 @@ void s72_print_value(S72Value val) {
         } else {
             printf("%.15g", num);
         }
+    } else if (s72_is_list(val)) {
+        // Check list first before symbol (both may return true due to vtable inheritance)
+        printf("<list>");
     } else if (s72_is_symbol(val)) {
         printf("'%s", s72_as_symbol(val));
     } else {
@@ -190,6 +208,10 @@ void s72_init(int *argc, char ***argv, char ***envp) {
     s72_number_init();
     s72_string_init();
     s72_symbol_init();
+    s72_boolean_init();
+    s72_block_init();
+    s72_list_init();
+    s72_transcript_init();
     s72_object_init();
     s72_eval_init();
 
@@ -221,27 +243,28 @@ static void s72_create_vtables(void) {
     s72_symbol_vtable = S72_PROTO(s72_object_vtable);
     s72_list_vtable = S72_PROTO(s72_object_vtable);
     s72_block_vtable = S72_PROTO(s72_object_vtable);
+    s72_transcript_vtable = S72_PROTO(s72_object_vtable);
 
     // No need for prototype objects - we allocate directly with vtables
 
     if (!s72_nil_vtable || !s72_boolean_vtable || !s72_number_vtable ||
         !s72_string_vtable || !s72_symbol_vtable || !s72_list_vtable ||
-        !s72_block_vtable) {
+        !s72_block_vtable || !s72_transcript_vtable) {
         s72_error("Failed to create type vtables");
     }
 }
 
 // Create singleton objects
 static void s72_create_singletons(void) {
-    // Create nil
-    S72_NIL.obj = NULL;  // nil is represented as NULL pointer
+    // Create nil as an actual object with nil vtable
+    S72_NIL.obj = S72_ALLOC(s72_nil_vtable, 0);
 
     // Create true and false
     S72_TRUE.obj = S72_ALLOC(s72_boolean_vtable, 0);
     S72_FALSE.obj = S72_ALLOC(s72_boolean_vtable, 0);
 
-    if (!S72_TRUE.obj || !S72_FALSE.obj) {
-        s72_error("Failed to create boolean singletons");
+    if (!S72_NIL.obj || !S72_TRUE.obj || !S72_FALSE.obj) {
+        s72_error("Failed to create singleton objects");
     }
 }
 

@@ -3,7 +3,10 @@
 #include "types/number.h"
 #include "types/string.h"
 #include "types/symbol.h"
+#include "types/block.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 // Need access to _libid
 extern struct __libid *_libid;
@@ -23,17 +26,91 @@ S72Env *s72_env_new(S72Env *parent) {
         s72_error("Failed to allocate environment");
         return NULL;
     }
-    
+
     env->parent = parent;
+    env->bindings = NULL;
     return env;
 }
 
 void s72_env_free(S72Env *env) {
     if (!env) return;
-    
-    // For M0, nothing to free yet
-    // Later milestones will need to free variable bindings
+
+    // Free all bindings
+    S72Binding *binding = env->bindings;
+    while (binding) {
+        S72Binding *next = binding->next;
+        free(binding->name);
+        free(binding);
+        binding = next;
+    }
+
     free(env);
+}
+
+// Bind a variable in the environment
+void s72_env_bind(S72Env *env, const char *name, S72Value value) {
+    if (!env || !name) return;
+
+    printf("DEBUG: s72_env_bind - binding '%s' to %p in env %p\n", name, value.obj, env);
+
+    // Check if binding already exists and update it
+    S72Binding *binding = env->bindings;
+    while (binding) {
+        if (strcmp(binding->name, name) == 0) {
+            binding->value = value;
+            return;
+        }
+        binding = binding->next;
+    }
+
+    // Create new binding
+    binding = malloc(sizeof(S72Binding));
+    if (!binding) {
+        s72_error("Failed to allocate binding");
+        return;
+    }
+
+    binding->name = strdup(name);
+    if (!binding->name) {
+        free(binding);
+        s72_error("Failed to copy binding name");
+        return;
+    }
+
+    binding->value = value;
+    binding->next = env->bindings;
+    env->bindings = binding;
+}
+
+// Look up a variable in the environment chain
+S72Value s72_env_lookup(S72Env *env, const char *name) {
+    if (!env || !name) return S72_NIL;
+
+    printf("DEBUG: s72_env_lookup - looking up '%s' in env %p\n", name, env);
+
+    // Search current environment
+    S72Binding *binding = env->bindings;
+    while (binding) {
+        if (strcmp(binding->name, name) == 0) {
+            printf("DEBUG: Found binding for '%s': %p\n", name, binding->value.obj);
+            return binding->value;
+        }
+        binding = binding->next;
+    }
+
+    // Search parent environment
+    if (env->parent) {
+        return s72_env_lookup(env->parent, name);
+    }
+
+    printf("DEBUG: No binding found for '%s'\n", name);
+    return S72_NIL;
+}
+
+// Check if environment has a binding
+bool s72_env_has_binding(S72Env *env, const char *name) {
+    S72Value result = s72_env_lookup(env, name);
+    return !s72_is_nil(result);
 }
 
 // Main evaluator
@@ -81,11 +158,27 @@ S72Value s72_eval_atom(ASTNode *node, S72Env *env) {
         s72_error("Invalid atom node");
         return S72_NIL;
     }
-    
+
     const char *name = node->data.atom.name;
-    
-    // For M0, we don't have variable bindings yet
-    // All atoms are treated as symbols
+
+    // Check for special constants first
+    if (strcmp(name, "true") == 0) {
+        return S72_TRUE;
+    } else if (strcmp(name, "false") == 0) {
+        return S72_FALSE;
+    } else if (strcmp(name, "nil") == 0) {
+        return S72_NIL;
+    } else if (strcmp(name, "Transcript") == 0) {
+        return s72_make_transcript();
+    }
+
+    // Try variable lookup first
+    S72Value var_value = s72_env_lookup(env, name);
+    if (!s72_is_nil(var_value)) {
+        return var_value;
+    }
+
+    // If not found as variable, treat as symbol
     return s72_symbol_new(name);
 }
 
@@ -148,8 +241,9 @@ S72Value s72_eval_list(ASTNode *node, S72Env *env) {
     S72Value receiver = s72_eval(node->data.list.elements[0], env);
     printf("DEBUG: Receiver evaluated to %p\n", receiver.obj);
 
-    if (s72_is_nil(receiver)) {
-        s72_error("Cannot send message to nil");
+    // Allow messages to nil (it has methods now)
+    if (!receiver.obj) {
+        s72_error("Cannot send message to NULL receiver");
         return S72_NIL;
     }
 
@@ -202,14 +296,31 @@ S72Value s72_eval_list(ASTNode *node, S72Env *env) {
     return result;
 }
 
-// Evaluate block (for M0, just return a placeholder)
+// Evaluate block (create block object with captured environment)
 S72Value s72_eval_block(ASTNode *node, S72Env *env) {
     if (!node || node->type != AST_BLOCK) {
         s72_error("Invalid block node");
         return S72_NIL;
     }
-    
-    // For M0, blocks are not fully implemented
-    // We'll return a placeholder symbol
-    return s72_symbol_new("block");
+
+    printf("DEBUG: s72_eval_block - creating block with %d statements\n", node->data.block.count);
+
+    // For M2, we create a simple block with no parameters
+    // TODO: In later milestones, parse block parameters like [ :x :y | ... ]
+
+    // Create a single AST node for the block body
+    // If multiple statements, we'll need to create a compound statement
+    ASTNode *body = NULL;
+    if (node->data.block.count == 1) {
+        body = node->data.block.body[0];
+    } else if (node->data.block.count > 1) {
+        // Create a list node to hold multiple statements
+        body = ast_make_list();
+        for (int i = 0; i < node->data.block.count; i++) {
+            ast_list_add(body, node->data.block.body[i]);
+        }
+    }
+
+    // Create block with no parameters for M2
+    return s72_block_new(body, env, 0, NULL);
 }

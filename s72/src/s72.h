@@ -86,12 +86,16 @@ S72Value s72_make_boolean(bool value);
 S72Value s72_make_number(double value);
 S72Value s72_make_string(const char *str);
 S72Value s72_make_symbol(const char *name);
+S72Value s72_make_list_empty(void);
+S72Value s72_make_list_cons(S72Value first, S72Value rest);
+S72Value s72_make_transcript(void);
 
 bool s72_is_nil(S72Value val);
 bool s72_is_boolean(S72Value val);
 bool s72_is_number(S72Value val);
 bool s72_is_string(S72Value val);
 bool s72_is_symbol(S72Value val);
+bool s72_is_list(S72Value val);
 
 // Value extraction
 bool s72_as_boolean(S72Value val);

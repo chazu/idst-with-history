@@ -92,8 +92,9 @@ S72Method *s72_object_lookup_method(S72Value obj, oop selector) {
 
 // Message sending (core dispatch)
 S72Value s72_object_send(S72Value receiver, oop selector, int argc, S72Value *argv) {
-    if (s72_is_nil(receiver)) {
-        s72_error("Cannot send message to nil");
+    // Allow messages to nil (it has methods now)
+    if (!receiver.obj) {
+        s72_error("Cannot send message to NULL receiver");
         return S72_NIL;
     }
 

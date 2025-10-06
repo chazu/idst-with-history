@@ -1,0 +1,24 @@
+
+Transcript
+
+
+(Transcript print: "Hello")
+(Transcript print: " ")
+(Transcript print: "World")
+(Transcript cr)
+
+
+(Transcript print: 42)
+(Transcript cr)
+(Transcript print: true)
+(Transcript cr)
+(Transcript print: false)
+(Transcript cr)
+(Transcript print: 'symbol)
+(Transcript cr)
+
+
+(Transcript show: "Hello")
+(Transcript cr)
+(Transcript show: 'symbol)
+(Transcript cr)
