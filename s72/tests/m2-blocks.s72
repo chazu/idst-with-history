@@ -1,0 +1,15 @@
+[ 42 ]
+[ (3 + 4) ]
+[ "hello" ]
+
+([ 42 ] value)
+([ (3 + 4) ] value)
+([ "hello" ] value)
+
+(true ifTrue: [ 1 ])
+(false ifTrue: [ 1 ])
+(true ifFalse: [ 2 ])
+(false ifFalse: [ 2 ])
+
+(true ifTrue: [ 10 ] ifFalse: [ 20 ])
+(false ifTrue: [ 10 ] ifFalse: [ 20 ])

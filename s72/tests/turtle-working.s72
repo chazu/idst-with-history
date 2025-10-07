@@ -1,0 +1,5 @@
+(Turtle clear)
+(Turtle forward: 5)
+(Turtle show)
+(Turtle position)
+(Turtle heading)

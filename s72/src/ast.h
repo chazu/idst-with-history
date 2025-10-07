@@ -43,9 +43,11 @@ struct ASTNode {
         } list;
         
         struct {
-            ASTNode **body;
-            int count;
-            int capacity;
+            char **parameters;      // Parameter names (e.g., ["x", "y"])
+            int param_count;        // Number of parameters
+            ASTNode **body;         // Block body statements
+            int count;              // Number of body statements
+            int capacity;           // Allocated capacity for body
         } block;
     } data;
 };
@@ -61,6 +63,7 @@ ASTNode *ast_make_block(void);
 // AST manipulation
 void ast_list_add(ASTNode *list, ASTNode *element);
 void ast_block_add(ASTNode *block, ASTNode *element);
+void ast_block_add_parameter(ASTNode *block, const char *param_name);
 
 // AST cleanup
 void ast_free(ASTNode *node);

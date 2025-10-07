@@ -4,7 +4,7 @@
 (show: "Testing M4 standard library functions...")
 
 ; Test def: function
-(def testVar: 42)
+(def testVar 42)
 (show: "def: function works")
 
 ; Test show: function (should be available from init.s72)

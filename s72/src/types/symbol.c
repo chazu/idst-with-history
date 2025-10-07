@@ -1,6 +1,8 @@
 #include "symbol.h"
+#include "../env.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 
 // Global vtable for symbols
 extern oop s72_symbol_vtable;
@@ -15,6 +17,7 @@ void s72_symbol_init(void) {
     // Install native methods
     S72_METHOD(s72_symbol_vtable, SEL_PRINT, s72_symbol_print);
     S72_METHOD(s72_symbol_vtable, SEL_EQUALS, s72_symbol_equals);
+    S72_METHOD(s72_symbol_vtable, SEL_TO, s72_symbol_to);
 }
 
 // Symbol creation and testing
@@ -135,15 +138,59 @@ void s72_symbol_intern_selectors(void) {
     SEL_GREATER_EQUAL = _libid->intern(">=");
     SEL_PRINT = _libid->intern("print");
     SEL_VALUE = _libid->intern("value");
+    SEL_TO = _libid->intern("to:");
+    SEL_BECOME = _libid->intern("become:");
     SEL_DOES_NOT_UNDERSTAND = _libid->intern("doesNotUnderstand:");
 
     printf("DEBUG: Interned selectors - PLUS=%p, MINUS=%p, MULTIPLY=%p\n",
            SEL_PLUS, SEL_MINUS, SEL_MULTIPLY);
+    printf("DEBUG: Interned TO=%p, BECOME=%p\n", SEL_TO, SEL_BECOME);
 
     if (!SEL_PLUS || !SEL_MINUS || !SEL_MULTIPLY || !SEL_DIVIDE ||
         !SEL_EQUALS || !SEL_LESS_THAN || !SEL_GREATER_THAN ||
         !SEL_LESS_EQUAL || !SEL_GREATER_EQUAL || !SEL_PRINT || !SEL_VALUE ||
-        !SEL_DOES_NOT_UNDERSTAND) {
+        !SEL_TO || !SEL_BECOME || !SEL_DOES_NOT_UNDERSTAND) {
         s72_error("Failed to intern core selectors");
     }
+}
+
+// Smalltalk-72 authentic 'to' binding: (x to 42)
+oop s72_symbol_to(oop closure, oop state, oop receiver, ...) {
+    va_list args;
+    va_start(args, receiver);
+    oop value = va_arg(args, oop);
+    va_end(args);
+
+    printf("DEBUG: *** s72_symbol_to ENTRY *** - receiver=%p, value=%p\n", receiver, value);
+    fflush(stdout);
+
+    // Get the symbol name from the receiver
+    S72Value symbol_val = {receiver};
+    if (!s72_is_symbol(symbol_val)) {
+        s72_error("'to' can only be sent to symbols");
+        return S72_NIL.obj;
+    }
+
+    const char *symbol_name = s72_symbol_name(symbol_val);
+    if (!symbol_name) {
+        s72_error("Invalid symbol for 'to' binding");
+        return S72_NIL.obj;
+    }
+
+    // Create S72Value from the oop
+    S72Value val = {value};
+
+    // Bind the symbol to the value in the global environment
+    // This is the authentic Smalltalk-72 behavior - 'to' creates global bindings
+    S72Env *global_env = s72_env_get_global();
+    if (global_env) {
+        s72_env_bind(global_env, symbol_name, val);
+        printf("DEBUG: 'to' bound global variable '%s' to %p\n", symbol_name, value);
+    } else {
+        s72_error("Global environment not initialized");
+        return S72_NIL.obj;
+    }
+
+    // Return the value that was bound (Smalltalk-72 style)
+    return value;
 }

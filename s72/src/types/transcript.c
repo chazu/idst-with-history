@@ -13,7 +13,7 @@ extern oop s72_object_vtable;
 
 // Global transcript singleton
 static S72Value S72_TRANSCRIPT;
-static oop s72_transcript_vtable = NULL;
+extern oop s72_transcript_vtable;
 
 // Global selectors for transcript operations
 static oop SEL_TRANSCRIPT_PRINT = NULL;

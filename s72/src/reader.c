@@ -125,6 +125,20 @@ Token reader_next_token(Reader *reader) {
             reader->pos++;
             reader->column++;
             break;
+
+        case ':':
+            token.type = TOKEN_COLON;
+            token.value = strdup(":");
+            reader->pos++;
+            reader->column++;
+            break;
+
+        case '|':
+            token.type = TOKEN_PIPE;
+            token.value = strdup("|");
+            reader->pos++;
+            reader->column++;
+            break;
             
         case '"': {
             // String literal
@@ -322,9 +336,39 @@ ASTNode *reader_parse_block(Reader *reader) {
         return NULL;
     }
     reader_consume_token(reader);  // consume [
-    
+
     ASTNode *block = ast_make_block();
-    
+
+    // Check for block parameters (syntax: [ :param1 :param2 | ... ])
+    token = reader_peek_token(reader);
+    if (token.type == TOKEN_COLON) {
+        // Parse parameters
+        while (token.type == TOKEN_COLON) {
+            reader_consume_token(reader);  // consume :
+
+            token = reader_peek_token(reader);
+            if (token.type != TOKEN_ATOM) {
+                reader_error(reader, "Expected parameter name after ':'");
+                ast_free(block);
+                return NULL;
+            }
+
+            ast_block_add_parameter(block, token.value);
+            reader_consume_token(reader);  // consume parameter name
+
+            token = reader_peek_token(reader);
+        }
+
+        // Expect | after parameters
+        if (token.type != TOKEN_PIPE) {
+            reader_error(reader, "Expected '|' after block parameters");
+            ast_free(block);
+            return NULL;
+        }
+        reader_consume_token(reader);  // consume |
+    }
+
+    // Parse block body
     while (true) {
         token = reader_peek_token(reader);
         if (token.type == TOKEN_EOF) {
@@ -332,21 +376,21 @@ ASTNode *reader_parse_block(Reader *reader) {
             ast_free(block);
             return NULL;
         }
-        
+
         if (token.type == TOKEN_RBRACKET) {
             reader_consume_token(reader);  // consume ]
             break;
         }
-        
+
         ASTNode *element = reader_parse_expression(reader);
         if (!element) {
             ast_free(block);
             return NULL;
         }
-        
+
         ast_block_add(block, element);
     }
-    
+
     return block;
 }
 

@@ -1,0 +1,12 @@
+(Turtle clear)
+(Turtle forward: 8)
+(Turtle show)
+(Turtle position)
+(Turtle heading)
+
+(Turtle clear)
+(Turtle penUp)
+(Turtle forward: 3)
+(Turtle penDown)
+(Turtle forward: 3)
+(Turtle show)

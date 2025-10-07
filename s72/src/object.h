@@ -47,5 +47,6 @@ bool s72_object_responds_to(S72Value obj, oop selector);
 // Default methods
 oop s72_object_does_not_understand(oop closure, oop state, oop receiver, ...);
 oop s72_object_class(oop closure, oop state, oop receiver);
+oop s72_object_become(oop closure, oop state, oop receiver, ...);
 
 #endif // OBJECT_H

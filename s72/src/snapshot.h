@@ -52,7 +52,7 @@ typedef struct {
     FILE *file;               // File handle
     uint32_t next_object_id;  // Next available object ID
     void *object_map;         // Hash table: oop -> object_id (for serialization)
-    void *id_map;             // Hash table: object_id -> oop (for deserialization)
+    void *reverse_map;        // Reverse mapping: object_id -> oop (for deserialization)
     bool writing;             // True if writing, false if reading
 } S72SnapshotContext;
 

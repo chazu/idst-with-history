@@ -4,7 +4,6 @@
 
 ; Print startup message
 (Transcript print: "S72 Standard Library Loading...")
-(Transcript cr)
 
 ; ============================================================================
 ; Core Language Extensions

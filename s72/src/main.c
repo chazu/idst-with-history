@@ -9,7 +9,9 @@
 #include "types/boolean.h"
 #include "types/block.h"
 #include "types/list.h"
+#include "types/array.h"
 #include "types/transcript.h"
+#include "types/turtle.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,6 +33,8 @@ oop SEL_LESS_EQUAL = NULL;
 oop SEL_GREATER_EQUAL = NULL;
 oop SEL_PRINT = NULL;
 oop SEL_VALUE = NULL;
+oop SEL_TO = NULL;
+oop SEL_BECOME = NULL;
 oop SEL_DOES_NOT_UNDERSTAND = NULL;
 
 // Global singletons
@@ -45,8 +49,10 @@ oop s72_number_vtable = NULL;
 oop s72_string_vtable = NULL;
 oop s72_symbol_vtable = NULL;
 oop s72_list_vtable = NULL;
+oop s72_array_vtable = NULL;
 oop s72_block_vtable = NULL;
 oop s72_transcript_vtable = NULL;
+oop s72_turtle_vtable = NULL;
 oop s72_object_vtable = NULL;
 
 // Global prototype objects - no longer needed, using vtables directly
@@ -212,7 +218,9 @@ void s72_init(int *argc, char ***argv, char ***envp) {
     s72_boolean_init();
     s72_block_init();
     s72_list_init();
+    s72_array_init();
     s72_transcript_init();
+    s72_turtle_init();
     s72_object_init();
     s72_eval_init();
 
@@ -243,13 +251,16 @@ static void s72_create_vtables(void) {
     s72_string_vtable = S72_PROTO(s72_object_vtable);
     s72_symbol_vtable = S72_PROTO(s72_object_vtable);
     s72_list_vtable = S72_PROTO(s72_object_vtable);
+    s72_array_vtable = S72_PROTO(s72_object_vtable);
     s72_block_vtable = S72_PROTO(s72_object_vtable);
     s72_transcript_vtable = S72_PROTO(s72_object_vtable);
+    s72_turtle_vtable = S72_PROTO(s72_object_vtable);
 
     // No need for prototype objects - we allocate directly with vtables
 
     if (!s72_nil_vtable || !s72_boolean_vtable || !s72_number_vtable ||
         !s72_string_vtable || !s72_symbol_vtable || !s72_list_vtable ||
+        !s72_array_vtable ||
         !s72_block_vtable || !s72_transcript_vtable) {
         s72_error("Failed to create type vtables");
     }
@@ -410,8 +421,26 @@ static void s72_repl(void) {
         printf("DEBUG: Parse returned %p\n", ast);
 
         if (!ast) {
-            printf("Parse error\n");
-            continue;
+            // Check if input is empty or contains only whitespace/comments
+            bool is_empty = true;
+            for (int i = 0; input[i]; i++) {
+                if (input[i] != ' ' && input[i] != '\t' && input[i] != '\n' && input[i] != '\r') {
+                    if (input[i] == ';') {
+                        // Rest of line is comment, so line is effectively empty
+                        break;
+                    }
+                    is_empty = false;
+                    break;
+                }
+            }
+
+            if (is_empty) {
+                // Empty line or comment-only line, just continue
+                continue;
+            } else {
+                printf("Parse error\n");
+                continue;
+            }
         }
 
         printf("DEBUG: AST type = %d\n", ast->type);

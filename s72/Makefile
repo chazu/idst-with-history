@@ -15,6 +15,7 @@ SOURCES = src/main.c \
           src/reader.c \
           src/ast.c \
           src/eval.c \
+          src/env.c \
           src/object.c \
           src/snapshot.c \
           src/types/number.c \
@@ -23,7 +24,9 @@ SOURCES = src/main.c \
           src/types/boolean.c \
           src/types/block.c \
           src/types/list.c \
-          src/types/transcript.c
+          src/types/array.c \
+          src/types/transcript.c \
+          src/types/turtle.c
 
 OBJECTS = $(SOURCES:.c=.o)
 TARGET = s72

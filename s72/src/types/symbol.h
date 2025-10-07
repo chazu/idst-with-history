@@ -21,6 +21,7 @@ oop s72_symbol_oop(S72Value val);  // Get the underlying libid oop
 // Symbol methods (native implementations)
 oop s72_symbol_print(struct __send *send, oop self, oop receiver);
 oop s72_symbol_equals(struct __send *send, oop self, oop receiver, oop arg);
+oop s72_symbol_to(oop closure, oop state, oop receiver, ...);
 
 // Symbol table management
 void s72_symbol_intern_selectors(void);

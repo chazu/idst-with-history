@@ -11,6 +11,8 @@ typedef enum {
     TOKEN_LBRACKET,    // [
     TOKEN_RBRACKET,    // ]
     TOKEN_QUOTE,       // '
+    TOKEN_COLON,       // :
+    TOKEN_PIPE,        // |
     TOKEN_ATOM,        // identifier/symbol
     TOKEN_NUMBER,      // numeric literal
     TOKEN_STRING,      // string literal

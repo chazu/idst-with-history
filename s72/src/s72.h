@@ -59,6 +59,8 @@ extern oop SEL_LESS_EQUAL;
 extern oop SEL_GREATER_EQUAL;
 extern oop SEL_PRINT;
 extern oop SEL_VALUE;
+extern oop SEL_TO;
+extern oop SEL_BECOME;
 extern oop SEL_DOES_NOT_UNDERSTAND;
 
 // Global singletons
@@ -74,6 +76,8 @@ extern oop s72_string_vtable;
 extern oop s72_symbol_vtable;
 extern oop s72_list_vtable;
 extern oop s72_block_vtable;
+extern oop s72_transcript_vtable;
+extern oop s72_turtle_vtable;
 extern oop s72_object_vtable;
 
 // Core API functions

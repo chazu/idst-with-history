@@ -93,12 +93,14 @@ ASTNode *ast_make_block(void) {
         s72_error("Out of memory creating block node");
         return NULL;
     }
-    
+
     node->type = AST_BLOCK;
+    node->data.block.parameters = NULL;
+    node->data.block.param_count = 0;
     node->data.block.body = NULL;
     node->data.block.count = 0;
     node->data.block.capacity = 0;
-    
+
     return node;
 }
 
@@ -146,6 +148,35 @@ void ast_block_add(ASTNode *block, ASTNode *element) {
     block->data.block.body[block->data.block.count++] = element;
 }
 
+void ast_block_add_parameter(ASTNode *block, const char *param_name) {
+    if (!block || block->type != AST_BLOCK) {
+        s72_error("ast_block_add_parameter: not a block node");
+        return;
+    }
+
+    if (!param_name) {
+        s72_error("ast_block_add_parameter: null parameter name");
+        return;
+    }
+
+    // Resize parameter array if needed
+    char **new_params = realloc(block->data.block.parameters,
+                               (block->data.block.param_count + 1) * sizeof(char*));
+    if (!new_params) {
+        s72_error("Out of memory expanding block parameters");
+        return;
+    }
+
+    block->data.block.parameters = new_params;
+    block->data.block.parameters[block->data.block.param_count] = strdup(param_name);
+    if (!block->data.block.parameters[block->data.block.param_count]) {
+        s72_error("Out of memory duplicating parameter name");
+        return;
+    }
+
+    block->data.block.param_count++;
+}
+
 // AST cleanup
 
 void ast_free(ASTNode *node) {
@@ -172,6 +203,13 @@ void ast_free(ASTNode *node) {
             break;
             
         case AST_BLOCK:
+            // Free parameters
+            for (int i = 0; i < node->data.block.param_count; i++) {
+                free(node->data.block.parameters[i]);
+            }
+            free(node->data.block.parameters);
+
+            // Free body
             for (int i = 0; i < node->data.block.count; i++) {
                 ast_free(node->data.block.body[i]);
             }

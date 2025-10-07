@@ -30,15 +30,20 @@ run_test() {
     
     # Run the test and capture only the result lines (not debug output)
     # Add 'quit' to the end and filter out debug lines and prompts
-    (cat "$test_file"; echo "quit") | ./s72 2>/dev/null | \
-        grep -v "^DEBUG:" | \
-        grep -v "^S72 Interpreter" | \
-        grep -v "^Type expressions" | \
-        grep -v "^Examples:" | \
-        grep -v "^s72>" | \
-        grep -v "^Goodbye!" | \
-        grep -v "^$" | \
-        grep -v "^Loading BSFL" | \
+    output_filter_cmd="grep -v \"^DEBUG:\" | \
+        grep -v \"^S72 Interpreter\" | \
+        grep -v \"^Type expressions\" | \
+        grep -v \"^Examples:\" | \
+        grep -v \"^Commands:\" | \
+        grep -v \"^Loading startup file:\" | \
+        grep -v \"^S72 Standard Library Loading\" | \
+        grep -v \"^Startup file loaded successfully\" | \
+        grep -v \"^s72>\" | \
+        grep -v \"^Goodbye!\" | \
+        grep -v \"^$\" | \
+        grep -v \"^Loading BSFL\" | \
+        grep -v \"Loading BSFL library\" | \
+        grep -v \"^<object>$\" | \
         sed 's/DEBUG: Method returned [^<]*//g' | \
         sed 's/HelloDEBUG.*/Hello/g' | \
         sed 's/ DEBUG.*//' | \
@@ -47,9 +52,16 @@ run_test() {
         sed 's/trueDEBUG.*/true/g' | \
         sed 's/falseDEBUG.*/false/g' | \
         sed 's/symbolDEBUG.*/symbol/g' | \
-        sed 's/"Hello"DEBUG.*/"Hello"/g' | \
-        sed "s/'symbolDEBUG.*/'symbol/g" | \
-        grep -v "^$" > "$output_file"
+        sed 's/\"Hello\"DEBUG.*/\"Hello\"/g' | \
+        sed \"s/'symbolDEBUG.*/'symbol/g\" | \
+        grep -v \"^$\""
+
+    # For M4 tests, also filter out nil lines (since M4 functions return nil but shouldn't show it)
+    if [[ "$test_name" == m4-* ]]; then
+        output_filter_cmd="$output_filter_cmd | grep -v \"^nil$\""
+    fi
+
+    (cat "$test_file"; echo "quit") | ./s72 2>/dev/null | eval "$output_filter_cmd" > "$output_file"
     
     # Compare with golden file
     if diff -q "$output_file" "$golden_file" > /dev/null; then

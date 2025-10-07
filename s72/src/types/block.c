@@ -1,4 +1,5 @@
 #include "block.h"
+#include "../env.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -109,17 +110,10 @@ S72Value s72_block_execute(S72Value block_val, int argc, S72Value *argv) {
            block, argc, block->param_count);
     
     // Create new environment for block execution
-    S72Env *block_env = s72_env_new(block->captured_env);
-    
-    // Bind parameters to arguments
-    int bind_count = (argc < block->param_count) ? argc : block->param_count;
-    for (int i = 0; i < bind_count; i++) {
-        if (block->param_names && block->param_names[i]) {
-            printf("DEBUG: Binding parameter '%s' to value %p\n", 
-                   block->param_names[i], argv[i].obj);
-            s72_env_bind(block_env, block->param_names[i], argv[i]);
-        }
-    }
+    S72Env *block_env = s72_env_create_child(block->captured_env);
+
+    // Bind parameters to arguments using the new environment system
+    s72_env_bind_parameters(block_env, block->param_count, block->param_names, argv);
     
     // Execute the block body
     S72Value result = S72_NIL;

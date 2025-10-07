@@ -1,117 +1,61 @@
 #include "eval.h"
+#include "env.h"
 #include "object.h"
 #include "types/number.h"
 #include "types/string.h"
 #include "types/symbol.h"
 #include "types/block.h"
+#include "types/transcript.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
 
 // Need access to _libid
 extern struct __libid *_libid;
 
-// Global environment
-S72Env *s72_global_env = NULL;
-
-// Evaluator initialization
-void s72_eval_init(void) {
-    s72_global_env = s72_env_new(NULL);
+// Global variable management using the environment system
+static void s72_def_global(const char *name, S72Value value) {
+    S72Env *global_env = s72_env_get_global();
+    if (global_env) {
+        s72_env_bind(global_env, name, value);
+        printf("DEBUG: def bound global variable '%s' to %p\n", name, value.obj);
+    } else {
+        s72_error("Global environment not initialized");
+    }
 }
 
-// Environment management
-S72Env *s72_env_new(S72Env *parent) {
-    S72Env *env = malloc(sizeof(S72Env));
-    if (!env) {
-        s72_error("Failed to allocate environment");
-        return NULL;
+static S72Value s72_get_global(const char *name) {
+    S72Env *global_env = s72_env_get_global();
+    if (global_env) {
+        return s72_env_lookup(global_env, name);
     }
-
-    env->parent = parent;
-    env->bindings = NULL;
-    return env;
-}
-
-void s72_env_free(S72Env *env) {
-    if (!env) return;
-
-    // Free all bindings
-    S72Binding *binding = env->bindings;
-    while (binding) {
-        S72Binding *next = binding->next;
-        free(binding->name);
-        free(binding);
-        binding = next;
-    }
-
-    free(env);
-}
-
-// Bind a variable in the environment
-void s72_env_bind(S72Env *env, const char *name, S72Value value) {
-    if (!env || !name) return;
-
-    printf("DEBUG: s72_env_bind - binding '%s' to %p in env %p\n", name, value.obj, env);
-
-    // Check if binding already exists and update it
-    S72Binding *binding = env->bindings;
-    while (binding) {
-        if (strcmp(binding->name, name) == 0) {
-            binding->value = value;
-            return;
-        }
-        binding = binding->next;
-    }
-
-    // Create new binding
-    binding = malloc(sizeof(S72Binding));
-    if (!binding) {
-        s72_error("Failed to allocate binding");
-        return;
-    }
-
-    binding->name = strdup(name);
-    if (!binding->name) {
-        free(binding);
-        s72_error("Failed to copy binding name");
-        return;
-    }
-
-    binding->value = value;
-    binding->next = env->bindings;
-    env->bindings = binding;
-}
-
-// Look up a variable in the environment chain
-S72Value s72_env_lookup(S72Env *env, const char *name) {
-    if (!env || !name) return S72_NIL;
-
-    printf("DEBUG: s72_env_lookup - looking up '%s' in env %p\n", name, env);
-
-    // Search current environment
-    S72Binding *binding = env->bindings;
-    while (binding) {
-        if (strcmp(binding->name, name) == 0) {
-            printf("DEBUG: Found binding for '%s': %p\n", name, binding->value.obj);
-            return binding->value;
-        }
-        binding = binding->next;
-    }
-
-    // Search parent environment
-    if (env->parent) {
-        return s72_env_lookup(env->parent, name);
-    }
-
-    printf("DEBUG: No binding found for '%s'\n", name);
     return S72_NIL;
 }
 
-// Check if environment has a binding
-bool s72_env_has_binding(S72Env *env, const char *name) {
-    S72Value result = s72_env_lookup(env, name);
-    return !s72_is_nil(result);
+static bool s72_set_global(const char *name, S72Value value) {
+    S72Env *global_env = s72_env_get_global();
+    if (global_env) {
+        // Try to set existing variable first
+        if (s72_env_set(global_env, name, value)) {
+            printf("DEBUG: set updated global variable '%s' to %p\n", name, value.obj);
+            return true;
+        } else {
+            // Variable doesn't exist, create it
+            s72_env_bind(global_env, name, value);
+            printf("DEBUG: set created global variable '%s' with value %p\n", name, value.obj);
+            return true;
+        }
+    }
+    return false;
 }
+
+// Evaluator initialization
+void s72_eval_init(void) {
+    // Use the new environment system
+    s72_env_init_global();
+}
+
+// Environment management functions are now in env.c
 
 // Main evaluator
 S72Value s72_eval(ASTNode *node, S72Env *env) {
@@ -178,6 +122,13 @@ S72Value s72_eval_atom(ASTNode *node, S72Env *env) {
         return var_value;
     }
 
+    // Try global variable lookup
+    S72Value global_value = s72_get_global(name);
+    if (!s72_is_nil(global_value)) {
+        printf("DEBUG: Found global variable '%s'\n", name);
+        return global_value;
+    }
+
     // If not found as variable, treat as symbol
     return s72_symbol_new(name);
 }
@@ -227,6 +178,170 @@ S72Value s72_eval_list(ASTNode *node, S72Env *env) {
     }
 
     printf("DEBUG: List has %d elements\n", node->data.list.count);
+
+    // Check if this is a global function call
+    // Format: (function_name arg1 arg2 ...)
+    if (node->data.list.elements[0]->type == AST_ATOM) {
+        const char *func_name = node->data.list.elements[0]->data.atom.name;
+
+        // Handle built-in global functions
+        if (strcmp(func_name, "show:") == 0 && node->data.list.count == 2) {
+            S72Value arg = s72_eval(node->data.list.elements[1], env);
+            S72Value transcript = s72_transcript_singleton();
+            oop print_sel = _libid->intern("print:");
+            oop cr_sel = _libid->intern("cr");
+            S72Value args[1] = { arg };
+            s72_object_send(transcript, print_sel, 1, args);
+            s72_object_send(transcript, cr_sel, 0, NULL);
+            return S72_NIL;
+        }
+        else if (strcmp(func_name, "println:") == 0 && node->data.list.count == 2) {
+            S72Value arg = s72_eval(node->data.list.elements[1], env);
+            S72Value transcript = s72_transcript_singleton();
+            oop print_sel = _libid->intern("print:");
+            oop cr_sel = _libid->intern("cr");
+            S72Value args[1] = { arg };
+            s72_object_send(transcript, print_sel, 1, args);
+            s72_object_send(transcript, cr_sel, 0, NULL);
+            return S72_NIL;
+        }
+        else if (strcmp(func_name, "def") == 0 && node->data.list.count == 3) {
+            // Extract variable name and value
+            ASTNode *name_node = node->data.list.elements[1];
+            if (name_node->type != AST_ATOM) {
+                fprintf(stderr, "Error: def expects a symbol name\n");
+                return S72_NIL;
+            }
+
+            S72Value value = s72_eval(node->data.list.elements[2], env);
+            const char *var_name = name_node->data.atom.name;
+
+            // Store the global variable using the environment system
+            s72_def_global(var_name, value);
+
+            return value;  // Return the value that was defined
+        }
+        else if (strcmp(func_name, "let") == 0 && node->data.list.count == 3) {
+            // let creates a local variable in the current environment
+            ASTNode *name_node = node->data.list.elements[1];
+            if (name_node->type != AST_ATOM) {
+                fprintf(stderr, "Error: let expects a symbol name\n");
+                return S72_NIL;
+            }
+
+            S72Value value = s72_eval(node->data.list.elements[2], env);
+            const char *var_name = name_node->data.atom.name;
+
+            // Bind in current environment (local variable)
+            s72_env_bind(env, var_name, value);
+            printf("DEBUG: let bound local variable '%s' to %p\n", var_name, value.obj);
+
+            return value;  // Return the value that was bound
+        }
+        else if (strcmp(func_name, "set") == 0 && node->data.list.count == 3) {
+            // set modifies an existing variable (searches environment chain)
+            ASTNode *name_node = node->data.list.elements[1];
+            if (name_node->type != AST_ATOM) {
+                fprintf(stderr, "Error: set expects a symbol name\n");
+                return S72_NIL;
+            }
+
+            S72Value value = s72_eval(node->data.list.elements[2], env);
+            const char *var_name = name_node->data.atom.name;
+
+            // Try to set in environment chain first
+            if (s72_env_set(env, var_name, value)) {
+                printf("DEBUG: set updated local variable '%s' to %p\n", var_name, value.obj);
+                return value;
+            }
+
+            // If not found locally, try global
+            if (s72_set_global(var_name, value)) {
+                return value;
+            }
+
+            // Variable not found anywhere
+            fprintf(stderr, "Error: set cannot find variable '%s'\n", var_name);
+            return S72_NIL;
+        }
+        else if (strcmp(func_name, "not:") == 0 && node->data.list.count == 2) {
+            S72Value arg = s72_eval(node->data.list.elements[1], env);
+            if (arg.obj == S72_TRUE.obj) {
+                return S72_FALSE;
+            } else {
+                return S72_TRUE;
+            }
+        }
+        else if (strcmp(func_name, "and:") == 0 && node->data.list.count == 3) {
+            S72Value a = s72_eval(node->data.list.elements[1], env);
+            S72Value b = s72_eval(node->data.list.elements[2], env);
+            if ((a.obj == S72_FALSE.obj || a.obj == S72_NIL.obj) ||
+                (b.obj == S72_FALSE.obj || b.obj == S72_NIL.obj)) {
+                return S72_FALSE;
+            } else {
+                return S72_TRUE;
+            }
+        }
+        else if (strcmp(func_name, "or:") == 0 && node->data.list.count == 3) {
+            S72Value a = s72_eval(node->data.list.elements[1], env);
+            S72Value b = s72_eval(node->data.list.elements[2], env);
+            if ((a.obj != S72_FALSE.obj && a.obj != S72_NIL.obj) ||
+                (b.obj != S72_FALSE.obj && b.obj != S72_NIL.obj)) {
+                return S72_TRUE;
+            } else {
+                return S72_FALSE;
+            }
+        }
+        else if (strcmp(func_name, "abs:") == 0 && node->data.list.count == 2) {
+            S72Value arg = s72_eval(node->data.list.elements[1], env);
+            if (s72_is_number(arg)) {
+                double val = s72_number_value(arg);
+                return s72_number_new(val < 0 ? -val : val);
+            }
+            return S72_NIL;
+        }
+        else if (strcmp(func_name, "min:") == 0 && node->data.list.count == 3) {
+            S72Value a = s72_eval(node->data.list.elements[1], env);
+            S72Value b = s72_eval(node->data.list.elements[2], env);
+            if (s72_is_number(a) && s72_is_number(b)) {
+                double va = s72_number_value(a);
+                double vb = s72_number_value(b);
+                return s72_number_new(va < vb ? va : vb);
+            }
+            return S72_NIL;
+        }
+        else if (strcmp(func_name, "max:") == 0 && node->data.list.count == 3) {
+            S72Value a = s72_eval(node->data.list.elements[1], env);
+            S72Value b = s72_eval(node->data.list.elements[2], env);
+            if (s72_is_number(a) && s72_is_number(b)) {
+                double va = s72_number_value(a);
+                double vb = s72_number_value(b);
+                return s72_number_new(va > vb ? va : vb);
+            }
+            return S72_NIL;
+        }
+        else if (strcmp(func_name, "square:") == 0 && node->data.list.count == 2) {
+            S72Value arg = s72_eval(node->data.list.elements[1], env);
+            if (s72_is_number(arg)) {
+                double val = s72_number_value(arg);
+                return s72_number_new(val * val);
+            }
+            return S72_NIL;
+        }
+        else if (strcmp(func_name, "assert:") == 0 && node->data.list.count == 2) {
+            S72Value condition = s72_eval(node->data.list.elements[1], env);
+            if (condition.obj == S72_FALSE.obj || condition.obj == S72_NIL.obj) {
+                S72Value transcript = s72_transcript_singleton();
+                oop print_sel = _libid->intern("print:");
+                oop cr_sel = _libid->intern("cr");
+                S72Value msg = s72_string_new("ASSERTION FAILED!");
+                S72Value args[1] = { msg };
+                s72_object_send(transcript, print_sel, 1, args);
+                s72_object_send(transcript, cr_sel, 0, NULL);
+            }
+            return S72_NIL;
+        }
+    }
 
     // For M1, we support simple message sends
     // Format: (receiver selector arg1 arg2 ...)
@@ -303,10 +418,8 @@ S72Value s72_eval_block(ASTNode *node, S72Env *env) {
         return S72_NIL;
     }
 
-    printf("DEBUG: s72_eval_block - creating block with %d statements\n", node->data.block.count);
-
-    // For M2, we create a simple block with no parameters
-    // TODO: In later milestones, parse block parameters like [ :x :y | ... ]
+    printf("DEBUG: s72_eval_block - creating block with %d statements and %d parameters\n",
+           node->data.block.count, node->data.block.param_count);
 
     // Create a single AST node for the block body
     // If multiple statements, we'll need to create a compound statement
@@ -321,6 +434,6 @@ S72Value s72_eval_block(ASTNode *node, S72Env *env) {
         }
     }
 
-    // Create block with no parameters for M2
-    return s72_block_new(body, env, 0, NULL);
+    // Create block with parsed parameters
+    return s72_block_new(body, env, node->data.block.param_count, node->data.block.parameters);
 }
