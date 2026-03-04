@@ -1,20 +1,19 @@
 #include "turtle.h"
-#include "../object.h"
 #include "number.h"
-#include "transcript.h"
+#include "boolean.h"
+#include "string.h"
 #include <math.h>
-#include <stdlib.h>
-#include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 // External references
 extern struct __libid *_libid;
-extern oop s72_object_vtable;
-extern S72Value S72_NIL;
+extern S72Value S72_TRUE, S72_FALSE, S72_NIL;
 
-// Global turtle instance and vtable
-oop s72_turtle_singleton = 0;
+// Global vtables and singleton (declared in main.c)
 extern oop s72_turtle_vtable;
+extern oop s72_canvas_vtable;
+oop s72_turtle_singleton = 0;
 
 // Math constants
 #ifndef M_PI
@@ -26,56 +25,163 @@ double s72_turtle_deg_to_rad(double degrees) {
     return degrees * M_PI / 180.0;
 }
 
-double s72_turtle_rad_to_deg(double radians) {
-    return radians * 180.0 / M_PI;
-}
+// ============================================================================
+// Canvas Implementation (Pure libid object)
+// ============================================================================
 
-// Canvas management
-void s72_turtle_clear_canvas(S72Turtle *turtle) {
-    for (int y = 0; y < turtle->canvas_height; y++) {
-        for (int x = 0; x < turtle->canvas_width; x++) {
-            turtle->canvas[y][x] = TURTLE_EMPTY_CHAR;
-        }
-        turtle->canvas[y][turtle->canvas_width] = '\0';
+oop s72_canvas_new(oop width_obj, oop height_obj) {
+    printf("DEBUG: s72_canvas_new called\n");
+
+    if (!s72_canvas_vtable) {
+        fprintf(stderr, "Error: Canvas vtable not initialized\n");
+        return 0;
     }
+
+    printf("DEBUG: Canvas vtable OK, allocating canvas object\n");
+
+    // Allocate canvas object using libid
+    oop canvas_obj = S72_ALLOC(s72_canvas_vtable, sizeof(struct t_Canvas));
+    if (!canvas_obj) {
+        fprintf(stderr, "Error: Failed to allocate canvas object\n");
+        return 0;
+    }
+
+    printf("DEBUG: Canvas object allocated at %p\n", canvas_obj);
+    
+    Canvas canvas = (Canvas)canvas_obj;
+    canvas->width = width_obj;
+    canvas->height = height_obj;
+    
+    // Get numeric values for canvas size
+    S72Value width_val = {width_obj};
+    S72Value height_val = {height_obj};
+    
+    if (!s72_is_number(width_val) || !s72_is_number(height_val)) {
+        fprintf(stderr, "Error: Canvas dimensions must be numbers\n");
+        return 0;
+    }
+    
+    int w = (int)s72_number_value(width_val);
+    int h = (int)s72_number_value(height_val);
+    
+    printf("DEBUG: Creating canvas data, w=%d, h=%d\n", w, h);
+
+    // Create canvas data as a single string (flat array)
+    size_t data_size = w * h + h; // +h for newlines
+    char *canvas_data = _libid->balloc(data_size + 1);
+    if (!canvas_data) {
+        fprintf(stderr, "Error: Failed to allocate canvas data\n");
+        return 0;
+    }
+
+    printf("DEBUG: Canvas data allocated, initializing\n");
+
+    // Initialize canvas with empty characters and newlines
+    int pos = 0;
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            canvas_data[pos++] = TURTLE_EMPTY_CHAR;
+        }
+        canvas_data[pos++] = '\n';
+    }
+    canvas_data[pos] = '\0';
+
+    printf("DEBUG: Canvas data initialized, creating string object\n");
+
+    // Create string object for canvas data
+    canvas->data = s72_string_new(canvas_data).obj;
+
+    printf("DEBUG: Canvas string object created\n");
+    
+    return canvas_obj;
 }
 
-void s72_turtle_draw_line(S72Turtle *turtle, double x1, double y1, double x2, double y2) {
-    printf("DEBUG: draw_line called with (%.2f,%.2f) to (%.2f,%.2f)\n", x1, y1, x2, y2);
-    printf("DEBUG: pen_down=%d\n", turtle->pen_down);
-
-    if (!turtle->pen_down) return;
-
-    // Simple line drawing using Bresenham-like algorithm
-    int ix1 = (int)(x1 + turtle->canvas_width / 2);
-    int iy1 = (int)(turtle->canvas_height / 2 - y1);
-    int ix2 = (int)(x2 + turtle->canvas_width / 2);
-    int iy2 = (int)(turtle->canvas_height / 2 - y2);
-
-    printf("DEBUG: canvas size: %dx%d\n", turtle->canvas_width, turtle->canvas_height);
-    printf("DEBUG: screen coords: (%d,%d) to (%d,%d)\n", ix1, iy1, ix2, iy2);
+oop s72_canvas_clear(oop closure, oop state, oop self) {
+    (void)closure; (void)state;
     
-    // Clamp to canvas bounds
-    if (ix1 < 0) ix1 = 0;
-    if (ix1 >= turtle->canvas_width) ix1 = turtle->canvas_width - 1;
-    if (iy1 < 0) iy1 = 0;
-    if (iy1 >= turtle->canvas_height) iy1 = turtle->canvas_height - 1;
-    if (ix2 < 0) ix2 = 0;
-    if (ix2 >= turtle->canvas_width) ix2 = turtle->canvas_width - 1;
-    if (iy2 < 0) iy2 = 0;
-    if (iy2 >= turtle->canvas_height) iy2 = turtle->canvas_height - 1;
+    Canvas canvas = (Canvas)self;
     
-    // Draw line
+    // Get canvas dimensions
+    S72Value width_val = {canvas->width};
+    S72Value height_val = {canvas->height};
+    
+    int w = (int)s72_number_value(width_val);
+    int h = (int)s72_number_value(height_val);
+    
+    // Get mutable access to canvas data
+    S72Value data_val = {canvas->data};
+    char *data = (char*)s72_string_data(data_val);
+    
+    // Clear canvas
+    int pos = 0;
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            data[pos++] = TURTLE_EMPTY_CHAR;
+        }
+        data[pos++] = '\n';
+    }
+    
+    return self;
+}
+
+oop s72_canvas_drawLine_from_to_(oop closure, oop state, oop self, ...) {
+    (void)closure; (void)state;
+
+    va_list args;
+    va_start(args, self);
+    oop from_x = va_arg(args, oop);
+    oop from_y = va_arg(args, oop);
+    oop to_x = va_arg(args, oop);
+    oop to_y = va_arg(args, oop);
+    va_end(args);
+
+    Canvas canvas = (Canvas)self;
+
+    // Extract coordinates
+    S72Value fx_val = {from_x}, fy_val = {from_y};
+    S72Value tx_val = {to_x}, ty_val = {to_y};
+    
+    if (!s72_is_number(fx_val) || !s72_is_number(fy_val) || 
+        !s72_is_number(tx_val) || !s72_is_number(ty_val)) {
+        fprintf(stderr, "Error: drawLine requires numeric coordinates\n");
+        return self;
+    }
+    
+    double x1 = s72_number_value(fx_val);
+    double y1 = s72_number_value(fy_val);
+    double x2 = s72_number_value(tx_val);
+    double y2 = s72_number_value(ty_val);
+    
+    // Get canvas dimensions
+    S72Value width_val = {canvas->width};
+    S72Value height_val = {canvas->height};
+    
+    int w = (int)s72_number_value(width_val);
+    int h = (int)s72_number_value(height_val);
+    
+    // Convert world coordinates to screen coordinates
+    int ix1 = (int)(x1 + w/2);
+    int iy1 = (int)(y1 + h/2);
+    int ix2 = (int)(x2 + w/2);
+    int iy2 = (int)(y2 + h/2);
+    
+    // Bresenham's line algorithm
     int dx = abs(ix2 - ix1);
     int dy = abs(iy2 - iy1);
-    int sx = (ix1 < ix2) ? 1 : -1;
-    int sy = (iy1 < iy2) ? 1 : -1;
+    int sx = ix1 < ix2 ? 1 : -1;
+    int sy = iy1 < iy2 ? 1 : -1;
     int err = dx - dy;
+    
+    // Get mutable access to canvas data
+    S72Value data_val = {canvas->data};
+    char *data = (char*)s72_string_data(data_val);
     
     int x = ix1, y = iy1;
     while (1) {
-        if (x >= 0 && x < turtle->canvas_width && y >= 0 && y < turtle->canvas_height) {
-            turtle->canvas[y][x] = TURTLE_CANVAS_CHAR;
+        // Draw pixel if within bounds
+        if (x >= 0 && x < w && y >= 0 && y < h) {
+            int pos = y * (w + 1) + x; // +1 for newline
+            data[pos] = TURTLE_CANVAS_CHAR;
         }
         
         if (x == ix2 && y == iy2) break;
@@ -90,240 +196,251 @@ void s72_turtle_draw_line(S72Turtle *turtle, double x1, double y1, double x2, do
             y += sy;
         }
     }
+    
+    return self;
 }
 
-void s72_turtle_print_canvas(S72Turtle *turtle) {
-    for (int y = 0; y < turtle->canvas_height; y++) {
-        printf("%s\n", turtle->canvas[y]);
-    }
+oop s72_canvas_show(oop closure, oop state, oop self) {
+    (void)closure; (void)state;
+    
+    Canvas canvas = (Canvas)self;
+    S72Value data_val = {canvas->data};
+    
+    printf("%s", s72_string_data(data_val));
+    return self;
 }
 
-// Turtle object creation
+// ============================================================================
+// Turtle Implementation (Pure libid object)
+// ============================================================================
+
 oop s72_turtle_new(void) {
+    printf("DEBUG: s72_turtle_new called\n");
+
     if (!s72_turtle_vtable) {
         fprintf(stderr, "Error: Turtle vtable not initialized\n");
-        return S72_NIL.obj;
+        return 0;
     }
 
-    oop turtle_obj = S72_ALLOC(s72_turtle_vtable, sizeof(S72Turtle));
+    printf("DEBUG: Turtle vtable OK, allocating turtle object\n");
+
+    // Allocate turtle object using libid
+    oop turtle_obj = S72_ALLOC(s72_turtle_vtable, sizeof(struct t_Turtle));
     if (!turtle_obj) {
         fprintf(stderr, "Error: Failed to allocate turtle object\n");
-        return S72_NIL.obj;
+        return 0;
     }
+
+    printf("DEBUG: Turtle object allocated at %p\n", turtle_obj);
     
-    S72Turtle *turtle = (S72Turtle *)turtle_obj;
+    Turtle turtle = (Turtle)turtle_obj;
     
-    // Initialize turtle state
-    turtle->x = 0.0;
-    turtle->y = 0.0;
-    turtle->heading = 0.0;  // Start facing east
-    turtle->pen_down = 1;   // Start with pen down
-    turtle->canvas_width = TURTLE_CANVAS_WIDTH;
-    turtle->canvas_height = TURTLE_CANVAS_HEIGHT;
+    // Initialize turtle state with proper libid objects
+    turtle->x = s72_number_new(0.0).obj;
+    turtle->y = s72_number_new(0.0).obj;
+    turtle->heading = s72_number_new(0.0).obj;
+    turtle->pen_down = S72_TRUE.obj;
     
-    // Allocate canvas
-    turtle->canvas = malloc(turtle->canvas_height * sizeof(char *));
-    if (!turtle->canvas) {
-        fprintf(stderr, "Error: Failed to allocate canvas rows\n");
-        return S72_NIL.obj;
-    }
-    
-    for (int y = 0; y < turtle->canvas_height; y++) {
-        turtle->canvas[y] = malloc((turtle->canvas_width + 1) * sizeof(char));
-        if (!turtle->canvas[y]) {
-            fprintf(stderr, "Error: Failed to allocate canvas row %d\n", y);
-            return S72_NIL.obj;
-        }
-    }
-    
-    s72_turtle_clear_canvas(turtle);
+    // Create canvas
+    oop width = s72_number_new(TURTLE_CANVAS_WIDTH).obj;
+    oop height = s72_number_new(TURTLE_CANVAS_HEIGHT).obj;
+    turtle->canvas = s72_canvas_new(width, height);
     
     return turtle_obj;
 }
 
-// Turtle method implementations
-oop s72_turtle_forward_(oop closure, oop state, oop receiver, ...) {
-    printf("DEBUG: turtle forward method called\n");
+oop s72_turtle_forward_(oop closure, oop state, oop self, ...) {
+    (void)closure; (void)state;
+
     va_list args;
-    va_start(args, receiver);
+    va_start(args, self);
     oop distance_obj = va_arg(args, oop);
     va_end(args);
 
-    printf("DEBUG: turtle forward got distance_obj=%p\n", (void*)distance_obj);
+    printf("DEBUG: s72_turtle_forward_ called with self=%p, distance_obj=%p\n", self, distance_obj);
 
-    S72Value distance_val = { .obj = distance_obj };
-    printf("DEBUG: turtle forward about to check if number\n");
+    Turtle turtle = (Turtle)self;
+
+    printf("DEBUG: Turtle cast successful\n");
+    
+    // Get current state
+    S72Value x_val = {turtle->x};
+    S72Value y_val = {turtle->y};
+    S72Value heading_val = {turtle->heading};
+    S72Value distance_val = {distance_obj};
+    
     if (!s72_is_number(distance_val)) {
         fprintf(stderr, "Error: forward: expects a number\n");
-        return S72_NIL.obj;
+        return self;
     }
-    printf("DEBUG: turtle forward confirmed it's a number\n");
-
-    S72Turtle *turtle = (S72Turtle *)receiver;
+    
+    double old_x = s72_number_value(x_val);
+    double old_y = s72_number_value(y_val);
+    double heading = s72_number_value(heading_val);
     double distance = s72_number_value(distance_val);
-
-    printf("DEBUG: forward: distance=%.2f, heading=%.2f\n", distance, turtle->heading);
-
+    
     // Calculate new position
-    double old_x = turtle->x;
-    double old_y = turtle->y;
-    double rad = s72_turtle_deg_to_rad(turtle->heading);
-
-    printf("DEBUG: forward: old_pos=(%.2f, %.2f), rad=%.4f\n", old_x, old_y, rad);
-
-    turtle->x += distance * cos(rad);
-    turtle->y += distance * sin(rad);
-
-    printf("DEBUG: forward: new_pos=(%.2f, %.2f)\n", turtle->x, turtle->y);
-
+    double rad = s72_turtle_deg_to_rad(heading);
+    double new_x = old_x + distance * cos(rad);
+    double new_y = old_y + distance * sin(rad);
+    
+    // Update turtle position with new number objects
+    turtle->x = s72_number_new(new_x).obj;
+    turtle->y = s72_number_new(new_y).obj;
+    
     // Draw line if pen is down
-    printf("DEBUG: forward: about to call draw_line\n");
-    s72_turtle_draw_line(turtle, old_x, old_y, turtle->x, turtle->y);
-    printf("DEBUG: forward: draw_line completed\n");
-
-    return receiver;
+    S72Value pen_val = {turtle->pen_down};
+    if (pen_val.obj == S72_TRUE.obj) {
+        oop old_x_obj = s72_number_new(old_x).obj;
+        oop old_y_obj = s72_number_new(old_y).obj;
+        oop new_x_obj = s72_number_new(new_x).obj;
+        oop new_y_obj = s72_number_new(new_y).obj;
+        
+        s72_canvas_drawLine_from_to_(0, 0, turtle->canvas, old_x_obj, old_y_obj, new_x_obj, new_y_obj);
+    }
+    
+    return self;
 }
 
-oop s72_turtle_turn_(oop closure, oop state, oop receiver, ...) {
+oop s72_turtle_turn_(oop closure, oop state, oop self, ...) {
+    (void)closure; (void)state;
+
     va_list args;
-    va_start(args, receiver);
+    va_start(args, self);
     oop angle_obj = va_arg(args, oop);
     va_end(args);
 
-    S72Value angle_val = { .obj = angle_obj };
+    Turtle turtle = (Turtle)self;
+    
+    S72Value angle_val = {angle_obj};
     if (!s72_is_number(angle_val)) {
         fprintf(stderr, "Error: turn: expects a number\n");
-        return S72_NIL.obj;
+        return self;
     }
-
-    S72Turtle *turtle = (S72Turtle *)receiver;
+    
+    S72Value heading_val = {turtle->heading};
+    double current_heading = s72_number_value(heading_val);
     double angle = s72_number_value(angle_val);
     
-    turtle->heading += angle;
+    double new_heading = current_heading + angle;
     
-    // Normalize heading to 0-360 range
-    while (turtle->heading < 0) turtle->heading += 360;
-    while (turtle->heading >= 360) turtle->heading -= 360;
-
-    return receiver;
-}
-
-oop s72_turtle_penUp(oop closure, oop state, oop receiver) {
-    (void)closure; (void)state; // Unused
-    S72Turtle *turtle = (S72Turtle *)receiver;
-    turtle->pen_down = 0;
-    return receiver;
-}
-
-oop s72_turtle_penDown(oop closure, oop state, oop receiver) {
-    (void)closure; (void)state; // Unused
-    S72Turtle *turtle = (S72Turtle *)receiver;
-    turtle->pen_down = 1;
-    return receiver;
-}
-
-oop s72_turtle_goto_(oop closure, oop state, oop receiver, ...) {
-    va_list args;
-    va_start(args, receiver);
-    oop x_obj = va_arg(args, oop);
-    oop y_obj = va_arg(args, oop);
-    va_end(args);
-
-    S72Value x_val = { .obj = x_obj };
-    S72Value y_val = { .obj = y_obj };
-    if (!s72_is_number(x_val) || !s72_is_number(y_val)) {
-        fprintf(stderr, "Error: goto: expects two numbers\n");
-        return S72_NIL.obj;
-    }
-
-    S72Turtle *turtle = (S72Turtle *)receiver;
-    double old_x = turtle->x;
-    double old_y = turtle->y;
-
-    turtle->x = s72_number_value(x_val);
-    turtle->y = s72_number_value(y_val);
+    // Normalize to 0-360 range
+    while (new_heading < 0) new_heading += 360;
+    while (new_heading >= 360) new_heading -= 360;
     
-    // Draw line if pen is down
-    s72_turtle_draw_line(turtle, old_x, old_y, turtle->x, turtle->y);
+    // Update heading with new number object
+    turtle->heading = s72_number_new(new_heading).obj;
 
-    return receiver;
+    return self;
 }
 
-oop s72_turtle_clear(oop closure, oop state, oop receiver) {
-    (void)closure; (void)state; // Unused
-    S72Turtle *turtle = (S72Turtle *)receiver;
-    s72_turtle_clear_canvas(turtle);
-    return receiver;
+oop s72_turtle_penUp(oop closure, oop state, oop self) {
+    (void)closure; (void)state;
+
+    Turtle turtle = (Turtle)self;
+    turtle->pen_down = S72_FALSE.obj;
+    return self;
 }
 
-oop s72_turtle_show(oop closure, oop state, oop receiver) {
-    (void)closure; (void)state; // Unused
-    S72Turtle *turtle = (S72Turtle *)receiver;
-    s72_turtle_print_canvas(turtle);
-    return receiver;
+oop s72_turtle_penDown(oop closure, oop state, oop self) {
+    (void)closure; (void)state;
+
+    Turtle turtle = (Turtle)self;
+    turtle->pen_down = S72_TRUE.obj;
+    return self;
 }
 
-oop s72_turtle_position(oop closure, oop state, oop receiver) {
-    (void)closure; (void)state; // Unused
-    S72Turtle *turtle = (S72Turtle *)receiver;
-    printf("Position: (%.2f, %.2f)\n", turtle->x, turtle->y);
-    return receiver;
+oop s72_turtle_clear(oop closure, oop state, oop self) {
+    (void)closure; (void)state;
+
+    Turtle turtle = (Turtle)self;
+
+    // Reset turtle state
+    turtle->x = s72_number_new(0.0).obj;
+    turtle->y = s72_number_new(0.0).obj;
+    turtle->heading = s72_number_new(0.0).obj;
+    turtle->pen_down = S72_TRUE.obj;
+
+    // Clear canvas
+    s72_canvas_clear(0, 0, turtle->canvas);
+
+    return self;
 }
 
-oop s72_turtle_heading(oop closure, oop state, oop receiver) {
-    (void)closure; (void)state; // Unused
-    S72Turtle *turtle = (S72Turtle *)receiver;
-    printf("Heading: %.2f degrees\n", turtle->heading);
-    return receiver;
+oop s72_turtle_show(oop closure, oop state, oop self) {
+    (void)closure; (void)state;
+
+    Turtle turtle = (Turtle)self;
+    s72_canvas_show(0, 0, turtle->canvas);
+    return self;
 }
 
-// Installation functions
-void s72_turtle_install_methods(void) {
-    if (!s72_turtle_vtable) {
-        fprintf(stderr, "Error: Cannot install turtle methods - vtable not initialized\n");
+oop s72_turtle_position(oop closure, oop state, oop self) {
+    (void)closure; (void)state;
+
+    Turtle turtle = (Turtle)self;
+    S72Value x_val = {turtle->x};
+    S72Value y_val = {turtle->y};
+
+    printf("Position: (%.2f, %.2f)\n",
+           s72_number_value(x_val),
+           s72_number_value(y_val));
+
+    return self;  // Return self like other turtle methods
+}
+
+oop s72_turtle_heading_method(oop closure, oop state, oop self) {
+    (void)closure; (void)state;
+
+    Turtle turtle = (Turtle)self;
+    S72Value heading_val = {turtle->heading};
+
+    printf("Heading: %.2f degrees\n", s72_number_value(heading_val));
+
+    return self;  // Return self like other turtle methods
+}
+
+// ============================================================================
+// Initialization
+// ============================================================================
+
+void s72_turtle_init(void) {
+    // Vtables should already be created in main.c
+    if (!s72_turtle_vtable || !s72_canvas_vtable) {
+        fprintf(stderr, "Error: Turtle vtables not initialized\n");
         return;
     }
 
-    // Install turtle methods using S72_METHOD macro
-    oop sel_forward = _libid->intern("forward:");
-    oop sel_turn = _libid->intern("turn:");
-    oop sel_penUp = _libid->intern("penUp");
-    oop sel_penDown = _libid->intern("penDown");
-    oop sel_goto = _libid->intern("goto:");
-    oop sel_clear = _libid->intern("clear");
-    oop sel_show = _libid->intern("show");
-    oop sel_position = _libid->intern("position");
-    oop sel_heading = _libid->intern("heading");
+    // Install turtle methods
+    oop sel_forward = S72_INTERN("forward:");
+    oop sel_turn = S72_INTERN("turn:");
+    oop sel_penUp = S72_INTERN("penUp");
+    oop sel_penDown = S72_INTERN("penDown");
+    oop sel_clear = S72_INTERN("clear");
+    oop sel_show = S72_INTERN("show");
+    oop sel_position = S72_INTERN("position");
+    oop sel_heading = S72_INTERN("heading");
 
     S72_METHOD(s72_turtle_vtable, sel_forward, s72_turtle_forward_);
     S72_METHOD(s72_turtle_vtable, sel_turn, s72_turtle_turn_);
     S72_METHOD(s72_turtle_vtable, sel_penUp, s72_turtle_penUp);
     S72_METHOD(s72_turtle_vtable, sel_penDown, s72_turtle_penDown);
-    S72_METHOD(s72_turtle_vtable, sel_goto, s72_turtle_goto_);
     S72_METHOD(s72_turtle_vtable, sel_clear, s72_turtle_clear);
     S72_METHOD(s72_turtle_vtable, sel_show, s72_turtle_show);
     S72_METHOD(s72_turtle_vtable, sel_position, s72_turtle_position);
-    S72_METHOD(s72_turtle_vtable, sel_heading, s72_turtle_heading);
+    S72_METHOD(s72_turtle_vtable, sel_heading, s72_turtle_heading_method);
 
-    // Turtle methods installed successfully
-}
+    // Install canvas methods
+    oop sel_canvas_clear = S72_INTERN("clear");
+    oop sel_canvas_show = S72_INTERN("show");
+    oop sel_drawLine = S72_INTERN("drawLine:from:to:");
 
-void s72_turtle_init(void) {
-    // Create turtle vtable (should already be created in main.c)
-    if (!s72_turtle_vtable) {
-        fprintf(stderr, "Error: Turtle vtable not initialized\n");
-        return;
-    }
+    S72_METHOD(s72_canvas_vtable, sel_canvas_clear, s72_canvas_clear);
+    S72_METHOD(s72_canvas_vtable, sel_canvas_show, s72_canvas_show);
+    S72_METHOD(s72_canvas_vtable, sel_drawLine, s72_canvas_drawLine_from_to_);
 
-    // Install methods
-    s72_turtle_install_methods();
-
-    // Create singleton turtle instance
+    // Create singleton turtle
     s72_turtle_singleton = s72_turtle_new();
-    if (!s72_turtle_singleton) {
-        fprintf(stderr, "Error: Failed to create turtle singleton\n");
-        return;
-    }
 
-    // Turtle system initialized successfully
+    // Pure libid turtle system initialized successfully
 }

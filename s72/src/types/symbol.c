@@ -1,23 +1,63 @@
 #include "symbol.h"
-#include "../env.h"
+#include "string.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
 
-// Global vtable for symbols
+// External references
+extern struct __libid *_libid;
 extern oop s72_symbol_vtable;
+extern S72Value S72_TRUE, S72_FALSE, S72_NIL;
 
-// Symbol type initialization
-void s72_symbol_init(void) {
+// External global selectors
+extern oop SEL_PLUS, SEL_MINUS, SEL_MULTIPLY, SEL_DIVIDE;
+extern oop SEL_EQUALS, SEL_LESS_THAN, SEL_GREATER_THAN;
+extern oop SEL_LESS_EQUAL, SEL_GREATER_EQUAL;
+extern oop SEL_PRINT, SEL_VALUE, SEL_TO, SEL_BECOME, SEL_DOES_NOT_UNDERSTAND;
+
+// ============================================================================
+// Pure libid Symbol Implementation
+// ============================================================================
+
+oop s72_symbol_new_libid(const char *name) {
     if (!s72_symbol_vtable) {
-        s72_error("Symbol vtable not initialized");
-        return;
+        fprintf(stderr, "Error: Symbol vtable not initialized\n");
+        return 0;
     }
-
-    // Install native methods
-    S72_METHOD(s72_symbol_vtable, SEL_PRINT, s72_symbol_print);
-    S72_METHOD(s72_symbol_vtable, SEL_EQUALS, s72_symbol_equals);
-    S72_METHOD(s72_symbol_vtable, SEL_TO, s72_symbol_to);
+    
+    if (!name) {
+        fprintf(stderr, "Error: Symbol name cannot be null\n");
+        return 0;
+    }
+    
+    // Allocate symbol object using libid
+    oop symbol_obj = S72_ALLOC(s72_symbol_vtable, sizeof(struct t_Symbol));
+    if (!symbol_obj) {
+        fprintf(stderr, "Error: Failed to allocate symbol object\n");
+        return 0;
+    }
+    
+    Symbol symbol = (Symbol)symbol_obj;
+    
+    // Intern the symbol name with libid
+    oop interned = S72_INTERN(name);
+    if (!interned) {
+        fprintf(stderr, "Error: Failed to intern symbol name\n");
+        return 0;
+    }
+    
+    symbol->interned_oop = interned;
+    
+    // Store name as String object (not malloc!)
+    S72Value name_str = s72_string_new(name);
+    if (s72_is_nil(name_str)) {
+        fprintf(stderr, "Error: Failed to create symbol name string\n");
+        return 0;
+    }
+    
+    symbol->name = name_str.obj;
+    
+    return symbol_obj;
 }
 
 // Symbol creation and testing
@@ -25,38 +65,29 @@ S72Value s72_symbol_new(const char *name) {
     if (!name) {
         return S72_NIL;
     }
-
-    // Intern the symbol using libid
-    oop interned = S72_INTERN(name);
-    if (!interned) {
-        s72_error("Failed to intern symbol");
+    
+    oop symbol_obj = s72_symbol_new_libid(name);
+    if (!symbol_obj) {
         return S72_NIL;
     }
-
-    // Create S72 symbol wrapper
-    oop sym_oop = S72_ALLOC(s72_symbol_vtable, sizeof(S72Symbol));
-    if (!sym_oop) {
-        s72_error("Failed to allocate symbol");
-        return S72_NIL;
-    }
-
-    S72Symbol *sym = (S72Symbol *)sym_oop;
-    sym->interned_oop = interned;
-    sym->name = strdup(name);  // Keep a copy for easy access
-
-    S72Value result = {sym_oop};
+    
+    S72Value result = {symbol_obj};
     return result;
 }
 
 bool s72_is_symbol(S72Value val) {
-    if (s72_is_nil(val)) {
-        return false;
-    }
-
-    // For M0, we'll use a simple heuristic:
-    // Check if this looks like a symbol object
-    S72Symbol *sym = (S72Symbol *)val.obj;
-    return sym && sym->name && sym->interned_oop;
+    if (s72_is_nil(val)) return false;
+    
+    // Check if object has the symbol vtable
+    if (!val.obj) return false;
+    
+    // Get the vtable from the libid object
+    oop *vtable_ptr = (oop *)val.obj;
+    oop obj_vtable = vtable_ptr[-1];
+    
+    // Compare with symbol vtable
+    oop expected_vtable = s72_symbol_vtable->_vtable[-1];
+    return (obj_vtable == expected_vtable);
 }
 
 const char *s72_symbol_name(S72Value val) {
@@ -64,133 +95,170 @@ const char *s72_symbol_name(S72Value val) {
         s72_error("Value is not a symbol");
         return "";
     }
-
-    S72Symbol *sym = (S72Symbol *)val.obj;
-    return sym->name ? sym->name : "";
+    
+    Symbol symbol = (Symbol)val.obj;
+    S72Value name_val = {symbol->name};
+    return s72_string_data(name_val);
 }
 
 oop s72_symbol_oop(S72Value val) {
-    printf("DEBUG: s72_symbol_oop called with val.obj=%p\n", val.obj);
-
     if (!s72_is_symbol(val)) {
         s72_error("Value is not a symbol");
         return NULL;
     }
-
-    S72Symbol *sym = (S72Symbol *)val.obj;
-    printf("DEBUG: sym=%p, sym->interned_oop=%p\n", sym, sym->interned_oop);
-    return sym->interned_oop;
+    
+    Symbol symbol = (Symbol)val.obj;
+    return symbol->interned_oop;
 }
 
-// Symbol methods
+// ============================================================================
+// Symbol Methods (Pure libid implementations)
+// ============================================================================
 
-oop s72_symbol_print(struct __send *send, oop self, oop receiver) {
-    S72Value recv_val = {receiver};
+oop s72_symbol_print(oop closure, oop state, oop self) {
+    (void)closure; (void)state;
     
-    if (!s72_is_symbol(recv_val)) {
-        s72_error("print called on non-symbol");
-        return NULL;
-    }
+    Symbol symbol = (Symbol)self;
+    S72Value name_val = {symbol->name};
+    const char *name = s72_string_data(name_val);
     
-    const char *name = s72_symbol_name(recv_val);
     printf("'%s", name);
-    
-    return receiver;  // Return self
+    return self;
 }
 
-oop s72_symbol_equals(struct __send *send, oop self, oop receiver, oop arg) {
+oop s72_symbol_equals(oop closure, oop state, oop self, ...) {
+    (void)closure; (void)state;
+    
+    va_list args;
+    va_start(args, self);
+    oop arg = va_arg(args, oop);
+    va_end(args);
+    
     if (!arg) {
         s72_error("= requires one argument");
-        return NULL;
+        return S72_FALSE.obj;
     }
     
-    S72Value recv_val = {receiver};
+    S72Value self_val = {self};
     S72Value arg_val = {arg};
     
-    if (!s72_is_symbol(recv_val)) {
+    if (!s72_is_symbol(self_val)) {
         s72_error("= called on non-symbol");
-        return NULL;
+        return S72_FALSE.obj;
     }
     
     if (!s72_is_symbol(arg_val)) {
         return S72_FALSE.obj;  // Different types are not equal
     }
     
-    // Symbols are interned, so we can compare by pointer equality
-    oop a = s72_symbol_oop(recv_val);
-    oop b = s72_symbol_oop(arg_val);
+    // Compare the interned oops - symbols with same name should have same interned oop
+    Symbol self_sym = (Symbol)self;
+    Symbol arg_sym = (Symbol)arg;
     
-    bool equal = (a == b);
+    bool equal = (self_sym->interned_oop == arg_sym->interned_oop);
     return equal ? S72_TRUE.obj : S72_FALSE.obj;
 }
 
-// Symbol table management
+oop s72_symbol_to(oop closure, oop state, oop self, ...) {
+    (void)closure; (void)state;
+    
+    va_list args;
+    va_start(args, self);
+    oop arg = va_arg(args, oop);
+    va_end(args);
+    
+    if (!arg) {
+        s72_error("to: requires one argument");
+        return S72_NIL.obj;
+    }
+    
+    // This would implement the "to:" method for creating ranges
+    // For now, just return a simple implementation
+    printf("Range from ");
+    s72_symbol_print(0, 0, self);
+    printf(" to ");
+    
+    S72Value arg_val = {arg};
+    if (s72_is_symbol(arg_val)) {
+        s72_symbol_print(0, 0, arg);
+    } else {
+        printf("<object>");
+    }
+    
+    return self;
+}
+
+// ============================================================================
+// Symbol Table Management
+// ============================================================================
+
 void s72_symbol_intern_selectors(void) {
-    // Intern common selectors used throughout the system
-    SEL_PLUS = _libid->intern("+");
-    SEL_MINUS = _libid->intern("-");
-    SEL_MULTIPLY = _libid->intern("*");
-    SEL_DIVIDE = _libid->intern("/");
-    SEL_EQUALS = _libid->intern("=");
-    SEL_LESS_THAN = _libid->intern("<");
-    SEL_GREATER_THAN = _libid->intern(">");
-    SEL_LESS_EQUAL = _libid->intern("<=");
-    SEL_GREATER_EQUAL = _libid->intern(">=");
-    SEL_PRINT = _libid->intern("print");
-    SEL_VALUE = _libid->intern("value");
-    SEL_TO = _libid->intern("to:");
-    SEL_BECOME = _libid->intern("become:");
-    SEL_DOES_NOT_UNDERSTAND = _libid->intern("doesNotUnderstand:");
+    // Intern common selectors used by the system and assign to global variables
+    // This ensures they're available for method dispatch
 
-    printf("DEBUG: Interned selectors - PLUS=%p, MINUS=%p, MULTIPLY=%p\n",
-           SEL_PLUS, SEL_MINUS, SEL_MULTIPLY);
-    printf("DEBUG: Interned TO=%p, BECOME=%p\n", SEL_TO, SEL_BECOME);
+    SEL_PLUS = S72_INTERN("+");
+    SEL_MINUS = S72_INTERN("-");
+    SEL_MULTIPLY = S72_INTERN("*");
+    SEL_DIVIDE = S72_INTERN("/");
+    SEL_EQUALS = S72_INTERN("=");
+    SEL_LESS_THAN = S72_INTERN("<");
+    SEL_GREATER_THAN = S72_INTERN(">");
+    SEL_LESS_EQUAL = S72_INTERN("<=");
+    SEL_GREATER_EQUAL = S72_INTERN(">=");
+    SEL_PRINT = S72_INTERN("print");
+    SEL_VALUE = S72_INTERN("value");
+    SEL_TO = S72_INTERN("to:");
+    SEL_BECOME = S72_INTERN("become:");
+    SEL_DOES_NOT_UNDERSTAND = S72_INTERN("doesNotUnderstand:");
 
+    // Additional selectors for other object types
+    S72_INTERN("print:");
+    S72_INTERN("at:");
+    S72_INTERN("at:put:");
+    S72_INTERN("size");
+    S72_INTERN("length");
+    S72_INTERN("forward:");
+    S72_INTERN("turn:");
+    S72_INTERN("penUp");
+    S72_INTERN("penDown");
+    S72_INTERN("clear");
+    S72_INTERN("show");
+    S72_INTERN("position");
+    S72_INTERN("heading");
+
+    // Verify all critical selectors were interned
     if (!SEL_PLUS || !SEL_MINUS || !SEL_MULTIPLY || !SEL_DIVIDE ||
         !SEL_EQUALS || !SEL_LESS_THAN || !SEL_GREATER_THAN ||
         !SEL_LESS_EQUAL || !SEL_GREATER_EQUAL || !SEL_PRINT || !SEL_VALUE ||
         !SEL_TO || !SEL_BECOME || !SEL_DOES_NOT_UNDERSTAND) {
         s72_error("Failed to intern core selectors");
     }
+
+    // Common selectors interned successfully
 }
 
-// Smalltalk-72 authentic 'to' binding: (x to 42)
-oop s72_symbol_to(oop closure, oop state, oop receiver, ...) {
-    va_list args;
-    va_start(args, receiver);
-    oop value = va_arg(args, oop);
-    va_end(args);
+// ============================================================================
+// Initialization
+// ============================================================================
 
-    printf("DEBUG: *** s72_symbol_to ENTRY *** - receiver=%p, value=%p\n", receiver, value);
-    fflush(stdout);
-
-    // Get the symbol name from the receiver
-    S72Value symbol_val = {receiver};
-    if (!s72_is_symbol(symbol_val)) {
-        s72_error("'to' can only be sent to symbols");
-        return S72_NIL.obj;
+void s72_symbol_init(void) {
+    // Vtable should already be created in main.c
+    if (!s72_symbol_vtable) {
+        fprintf(stderr, "Error: Symbol vtable not initialized\n");
+        return;
     }
-
-    const char *symbol_name = s72_symbol_name(symbol_val);
-    if (!symbol_name) {
-        s72_error("Invalid symbol for 'to' binding");
-        return S72_NIL.obj;
-    }
-
-    // Create S72Value from the oop
-    S72Value val = {value};
-
-    // Bind the symbol to the value in the global environment
-    // This is the authentic Smalltalk-72 behavior - 'to' creates global bindings
-    S72Env *global_env = s72_env_get_global();
-    if (global_env) {
-        s72_env_bind(global_env, symbol_name, val);
-        printf("DEBUG: 'to' bound global variable '%s' to %p\n", symbol_name, value);
-    } else {
-        s72_error("Global environment not initialized");
-        return S72_NIL.obj;
-    }
-
-    // Return the value that was bound (Smalltalk-72 style)
-    return value;
+    
+    // Install symbol methods
+    oop sel_print = S72_INTERN("print");
+    oop sel_equals = S72_INTERN("=");
+    oop sel_to = S72_INTERN("to:");
+    
+    S72_METHOD(s72_symbol_vtable, sel_print, s72_symbol_print);
+    S72_METHOD(s72_symbol_vtable, sel_equals, s72_symbol_equals);
+    S72_METHOD(s72_symbol_vtable, sel_to, s72_symbol_to);
+    
+    // Intern common selectors
+    s72_symbol_intern_selectors();
+    
+    // Pure libid symbol system initialized successfully
 }

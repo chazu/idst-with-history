@@ -1,163 +1,232 @@
 #include "block.h"
-#include "../env.h"
+#include "number.h"
+#include "array.h"
+#include "string.h"
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <stdarg.h>
 
 // External references
 extern struct __libid *_libid;
 extern oop s72_block_vtable;
+extern S72Value S72_TRUE, S72_FALSE, S72_NIL;
 
-// Global selectors for block operations
-static oop SEL_BLOCK_VALUE = NULL;
-static oop SEL_BLOCK_VALUE_WITH = NULL;
-static oop SEL_BLOCK_VALUE_WITH_WITH = NULL;
+// ============================================================================
+// Pure libid Block Implementation
+// ============================================================================
 
-// Block type initialization
-void s72_block_init(void) {
-    // Intern selectors
-    SEL_BLOCK_VALUE = _libid->intern("value");
-    SEL_BLOCK_VALUE_WITH = _libid->intern("value:");
-    SEL_BLOCK_VALUE_WITH_WITH = _libid->intern("value:value:");
-
-    // Install methods on block vtable
-    S72_METHOD(s72_block_vtable, SEL_BLOCK_VALUE, s72_block_value);
-    S72_METHOD(s72_block_vtable, SEL_BLOCK_VALUE_WITH, s72_block_value_with);
-    S72_METHOD(s72_block_vtable, SEL_BLOCK_VALUE_WITH_WITH, s72_block_value_with_with);
-
-    printf("DEBUG: Installed block methods on vtable %p\n", s72_block_vtable);
+oop s72_block_new_libid(ASTNode *body, S72Env *env, int param_count, char **param_names) {
+    if (!s72_block_vtable) {
+        fprintf(stderr, "Error: Block vtable not initialized\n");
+        return 0;
+    }
+    
+    // Allocate block object using libid
+    oop block_obj = S72_ALLOC(s72_block_vtable, sizeof(struct t_Block));
+    if (!block_obj) {
+        fprintf(stderr, "Error: Failed to allocate block object\n");
+        return 0;
+    }
+    
+    Block block = (Block)block_obj;
+    
+    // Store body AST as raw pointer for now (could be enhanced to be a proper object)
+    block->body = (oop)body;
+    
+    // Store captured environment as raw pointer for now (could be enhanced)
+    block->captured_env = (oop)env;
+    
+    // Store parameter count as Number object
+    block->param_count = s72_number_new((double)param_count).obj;
+    
+    // Store parameter names as Array of String objects (not malloc!)
+    if (param_count > 0 && param_names) {
+        S72Value param_array = s72_array_new(param_count);
+        if (s72_is_nil(param_array)) {
+            fprintf(stderr, "Error: Failed to create parameter names array\n");
+            return 0;
+        }
+        
+        // Fill array with String objects for each parameter name
+        for (int i = 0; i < param_count; i++) {
+            S72Value param_name_str = s72_string_new(param_names[i]);
+            if (s72_is_nil(param_name_str)) {
+                fprintf(stderr, "Error: Failed to create parameter name string\n");
+                return 0;
+            }
+            s72_array_set(param_array, i, param_name_str);
+        }
+        
+        block->param_names = param_array.obj;
+    } else {
+        // Empty array for no parameters
+        S72Value empty_array = s72_array_new(0);
+        block->param_names = empty_array.obj;
+    }
+    
+    return block_obj;
 }
 
-// Block creation
+// Block creation and testing
 S72Value s72_block_new(ASTNode *body, S72Env *env, int param_count, char **param_names) {
-    printf("DEBUG: s72_block_new - body=%p, env=%p, param_count=%d\n", body, env, param_count);
-    
-    // Allocate block object
-    oop block_oop = S72_ALLOC(s72_block_vtable, sizeof(S72Block));
-    if (!block_oop) {
-        s72_error("Failed to allocate block");
+    oop block_obj = s72_block_new_libid(body, env, param_count, param_names);
+    if (!block_obj) {
         return S72_NIL;
     }
     
-    S72Block *block = (S72Block *)block_oop;
+    S72Value result = {block_obj};
+    return result;
+}
+
+bool s72_is_block(S72Value val) {
+    if (s72_is_nil(val)) return false;
     
-    // Store the body AST (we'll need to copy it to avoid ownership issues)
-    block->body = body;  // For now, assume caller manages lifetime
+    // Check if object has the block vtable
+    if (!val.obj) return false;
     
-    // Capture the current environment
-    block->captured_env = env;
+    // Get the vtable from the libid object
+    oop *vtable_ptr = (oop *)val.obj;
+    oop obj_vtable = vtable_ptr[-1];
     
-    // Store parameter information
-    block->param_count = param_count;
-    if (param_count > 0 && param_names) {
-        block->param_names = malloc(param_count * sizeof(char*));
-        if (!block->param_names) {
-            s72_error("Failed to allocate parameter names");
+    // Compare with block vtable
+    oop expected_vtable = s72_block_vtable->_vtable[-1];
+    return (obj_vtable == expected_vtable);
+}
+
+// Block execution
+S72Value s72_block_execute(S72Value block_val, int argc, S72Value *argv) {
+    if (!s72_is_block(block_val)) {
+        s72_error("Value is not a block");
+        return S72_NIL;
+    }
+    
+    Block block = (Block)block_val.obj;
+    
+    // Get parameter count
+    S72Value param_count_val = {block->param_count};
+    int param_count = (int)s72_number_value(param_count_val);
+    
+    // Check argument count matches parameter count
+    if (argc != param_count) {
+        s72_error("Block argument count mismatch");
+        return S72_NIL;
+    }
+    
+    // Get AST body and environment
+    ASTNode *body = (ASTNode*)block->body;
+    S72Env *captured_env = (S72Env*)block->captured_env;
+    
+    if (!body || !captured_env) {
+        s72_error("Block has invalid body or environment");
+        return S72_NIL;
+    }
+    
+    // Create new environment for block execution
+    S72Env *block_env = s72_env_new(captured_env);
+    if (!block_env) {
+        s72_error("Failed to create block environment");
+        return S72_NIL;
+    }
+    
+    // Bind parameters to arguments
+    S72Value param_names_val = {block->param_names};
+    for (int i = 0; i < param_count; i++) {
+        S72Value param_name_val = s72_array_get(param_names_val, i);
+        if (!s72_is_string(param_name_val)) {
+            s72_error("Block parameter name is not a string");
             return S72_NIL;
         }
         
-        for (int i = 0; i < param_count; i++) {
-            block->param_names[i] = strdup(param_names[i]);
-            if (!block->param_names[i]) {
-                s72_error("Failed to copy parameter name");
-                return S72_NIL;
-            }
-        }
-    } else {
-        block->param_names = NULL;
+        const char *param_name = s72_string_data(param_name_val);
+        s72_env_bind(block_env, param_name, argv[i]);
     }
     
-    printf("DEBUG: Created block at %p\n", block_oop);
-    
-    S72Value result = {block_oop};
-    return result;
+    // Execute block body in the new environment
+    return s72_eval(body, block_env);
 }
 
-// Block type checking
-bool s72_is_block(S72Value val) {
-    if (s72_is_nil(val)) return false;
+// ============================================================================
+// Block Methods (Pure libid implementations)
+// ============================================================================
 
-    // Check if object has the block vtable
-    if (!val.obj) return false;
-
-    // Get the vtable from the libid object (libid stores vtable at position -1)
-    oop *vtable_ptr = (oop *)val.obj;
-    oop obj_vtable = vtable_ptr[-1];
-
-    // Compare with block vtable - s72_block_vtable is a prototype, so get its actual vtable
-    oop expected_vtable = s72_block_vtable->_vtable[-1];
-
-    // printf("DEBUG: s72_is_block - obj=%p, obj_vtable=%p, expected_vtable=%p\n",
-    //        val.obj, obj_vtable, expected_vtable);
-
-    if (obj_vtable == expected_vtable) {
-        return true;
-    }
-
-    return false;
-}
-
-// Block execution with parameter binding
-S72Value s72_block_execute(S72Value block_val, int argc, S72Value *argv) {
-    if (!s72_is_block(block_val)) {
-        s72_error("Cannot execute non-block value");
-        return S72_NIL;
-    }
+oop s72_block_value(oop closure, oop state, oop self) {
+    (void)closure; (void)state;
     
-    S72Block *block = (S72Block *)block_val.obj;
-    
-    printf("DEBUG: s72_block_execute - block=%p, argc=%d, param_count=%d\n", 
-           block, argc, block->param_count);
-    
-    // Create new environment for block execution
-    S72Env *block_env = s72_env_create_child(block->captured_env);
-
-    // Bind parameters to arguments using the new environment system
-    s72_env_bind_parameters(block_env, block->param_count, block->param_names, argv);
-    
-    // Execute the block body
-    S72Value result = S72_NIL;
-    if (block->body) {
-        result = s72_eval(block->body, block_env);
-    }
-    
-    // Clean up block environment (but not the captured environment)
-    s72_env_free(block_env);
-    
-    return result;
-}
-
-// Block method implementations
-
-// value - execute block with no arguments
-oop s72_block_value(oop closure, oop state, oop receiver) {
-    printf("DEBUG: s72_block_value called - receiver=%p\n", receiver);
-    
-    S72Value block_val = {receiver};
-    S72Value result = s72_block_execute(block_val, 0, NULL);
+    S72Value self_val = {self};
+    S72Value result = s72_block_execute(self_val, 0, NULL);
     
     return result.obj;
 }
 
-// value: - execute block with one argument
-oop s72_block_value_with(oop closure, oop state, oop receiver, oop arg1) {
-    printf("DEBUG: s72_block_value_with called - receiver=%p, arg=%p\n", receiver, arg1);
+oop s72_block_value_with(oop closure, oop state, oop self, ...) {
+    (void)closure; (void)state;
     
-    S72Value block_val = {receiver};
-    S72Value args[1] = {{arg1}};
-    S72Value result = s72_block_execute(block_val, 1, args);
+    va_list args;
+    va_start(args, self);
+    oop arg1 = va_arg(args, oop);
+    va_end(args);
+    
+    if (!arg1) {
+        s72_error("value: requires one argument");
+        return S72_NIL.obj;
+    }
+    
+    S72Value argv[1] = {{arg1}};
+    S72Value self_val = {self};
+    S72Value result = s72_block_execute(self_val, 1, argv);
     
     return result.obj;
 }
 
-// value:value: - execute block with two arguments
-oop s72_block_value_with_with(oop closure, oop state, oop receiver, oop arg1, oop arg2) {
-    printf("DEBUG: s72_block_value_with_with called - receiver=%p, arg1=%p, arg2=%p\n", 
-           receiver, arg1, arg2);
-    
-    S72Value block_val = {receiver};
-    S72Value args[2] = {{arg1}, {arg2}};
-    S72Value result = s72_block_execute(block_val, 2, args);
-    
+oop s72_block_value_with_with(oop closure, oop state, oop self, ...) {
+    (void)closure; (void)state;
+
+    va_list args;
+    va_start(args, self);
+    oop arg1 = va_arg(args, oop);
+    oop arg2 = va_arg(args, oop);
+    va_end(args);
+
+    if (!arg1 || !arg2) {
+        s72_error("value:with: requires two arguments");
+        return S72_NIL.obj;
+    }
+
+    S72Value argv[2] = {{arg1}, {arg2}};
+    S72Value self_val = {self};
+    S72Value result = s72_block_execute(self_val, 2, argv);
+
     return result.obj;
+}
+
+oop s72_block_print(oop closure, oop state, oop self) {
+    (void)closure; (void)state; (void)self;
+
+    // Blocks display as a single quote character
+    printf("'");
+    return self;
+}
+
+// ============================================================================
+// Initialization
+// ============================================================================
+
+void s72_block_init(void) {
+    // Vtable should already be created in main.c
+    if (!s72_block_vtable) {
+        fprintf(stderr, "Error: Block vtable not initialized\n");
+        return;
+    }
+    
+    // Install block methods
+    oop sel_value = S72_INTERN("value");
+    oop sel_value_with = S72_INTERN("value:");
+    oop sel_value_with_with = S72_INTERN("value:with:");
+    oop sel_print = S72_INTERN("print");
+
+    S72_METHOD(s72_block_vtable, sel_value, s72_block_value);
+    S72_METHOD(s72_block_vtable, sel_value_with, s72_block_value_with);
+    S72_METHOD(s72_block_vtable, sel_value_with_with, s72_block_value_with_with);
+    S72_METHOD(s72_block_vtable, sel_print, s72_block_print);
+    
+    // Pure libid block system initialized successfully
 }

@@ -3,11 +3,11 @@
 
 #include "../s72.h"
 
-// String object structure
-typedef struct S72String {
-    char *data;
-    size_t length;
-} S72String;
+// Pure libid string object structure
+typedef struct t_String {
+    oop length;    // Number object for string length
+    oop data;      // libid-allocated string data (char array)
+} *String;
 
 // String type initialization
 void s72_string_init(void);
@@ -19,9 +19,12 @@ bool s72_is_string(S72Value val);
 const char *s72_string_data(S72Value val);
 size_t s72_string_length(S72Value val);
 
-// String methods (native implementations)
-oop s72_string_print(struct __send *send, oop self, oop receiver);
-oop s72_string_equals(struct __send *send, oop self, oop receiver, oop arg);
-oop s72_string_length_method(struct __send *send, oop self, oop receiver);
+// String methods (pure libid implementations with variadic signatures)
+oop s72_string_print(oop closure, oop state, oop self);
+oop s72_string_equals(oop closure, oop state, oop self, ...);
+oop s72_string_length_method(oop closure, oop state, oop self);
+
+// String object creation
+oop s72_string_new_libid(const char *str, size_t length);
 
 #endif // STRING_H

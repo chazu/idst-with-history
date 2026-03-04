@@ -53,6 +53,7 @@ oop s72_array_vtable = NULL;
 oop s72_block_vtable = NULL;
 oop s72_transcript_vtable = NULL;
 oop s72_turtle_vtable = NULL;
+oop s72_canvas_vtable = NULL;
 oop s72_object_vtable = NULL;
 
 // Global prototype objects - no longer needed, using vtables directly
@@ -164,6 +165,10 @@ void s72_print_value(S72Value val) {
         printf("<list>");
     } else if (s72_is_symbol(val)) {
         printf("'%s", s72_as_symbol(val));
+    } else if (s72_is_block(val)) {
+        // Call the block's print method
+        oop print_sel = S72_INTERN("print");
+        s72_object_send(val, print_sel, 0, NULL);
     } else {
         printf("<object>");
     }
@@ -255,13 +260,15 @@ static void s72_create_vtables(void) {
     s72_block_vtable = S72_PROTO(s72_object_vtable);
     s72_transcript_vtable = S72_PROTO(s72_object_vtable);
     s72_turtle_vtable = S72_PROTO(s72_object_vtable);
+    s72_canvas_vtable = S72_PROTO(s72_object_vtable);
 
     // No need for prototype objects - we allocate directly with vtables
 
     if (!s72_nil_vtable || !s72_boolean_vtable || !s72_number_vtable ||
         !s72_string_vtable || !s72_symbol_vtable || !s72_list_vtable ||
         !s72_array_vtable ||
-        !s72_block_vtable || !s72_transcript_vtable) {
+        !s72_block_vtable || !s72_transcript_vtable || !s72_turtle_vtable ||
+        !s72_canvas_vtable) {
         s72_error("Failed to create type vtables");
     }
 }

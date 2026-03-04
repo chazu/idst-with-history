@@ -1,249 +1,260 @@
 #include "array.h"
-#include "block.h"
 #include "number.h"
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <stdarg.h>
 
 // External references
 extern struct __libid *_libid;
-
-// Array vtable (extern declaration - defined in main.c)
 extern oop s72_array_vtable;
+extern S72Value S72_TRUE, S72_FALSE, S72_NIL;
 
-// Global selectors for array operations
-static oop SEL_ARRAY_SIZE = NULL;
-static oop SEL_ARRAY_AT = NULL;
-static oop SEL_ARRAY_AT_PUT = NULL;
-static oop SEL_ARRAY_EACH = NULL;
+// ============================================================================
+// Pure libid Array Implementation
+// ============================================================================
 
-// Array type initialization
-void s72_array_init(void) {
+oop s72_array_new_libid(int size) {
     if (!s72_array_vtable) {
-        s72_error("Array vtable not initialized");
-        return;
+        fprintf(stderr, "Error: Array vtable not initialized\n");
+        return 0;
     }
-
-    // Intern selectors
-    SEL_ARRAY_SIZE = _libid->intern("size");
-    SEL_ARRAY_AT = _libid->intern("at:");
-    SEL_ARRAY_AT_PUT = _libid->intern("at:put:");
-    SEL_ARRAY_EACH = _libid->intern("each:");
-
-    // Install methods on array vtable
-    S72_METHOD(s72_array_vtable, SEL_ARRAY_SIZE, s72_array_size_method);
-    S72_METHOD(s72_array_vtable, SEL_ARRAY_AT, s72_array_at_method);
-    S72_METHOD(s72_array_vtable, SEL_ARRAY_AT_PUT, s72_array_at_put_method);
-    S72_METHOD(s72_array_vtable, SEL_ARRAY_EACH, s72_array_each_method);
-
-    printf("DEBUG: Installed array methods on vtable %p\n", s72_array_vtable);
+    
+    if (size < 0) {
+        fprintf(stderr, "Error: Array size cannot be negative\n");
+        return 0;
+    }
+    
+    // Allocate array object using libid
+    oop array_obj = S72_ALLOC(s72_array_vtable, sizeof(struct t_Array));
+    if (!array_obj) {
+        fprintf(stderr, "Error: Failed to allocate array object\n");
+        return 0;
+    }
+    
+    Array array = (Array)array_obj;
+    
+    // Store size as Number object
+    array->size = s72_number_new((double)size).obj;
+    
+    // Allocate elements array using libid (not malloc!)
+    oop *elements = (oop*)_libid->balloc(size * sizeof(oop));
+    if (!elements && size > 0) {
+        fprintf(stderr, "Error: Failed to allocate array elements\n");
+        return 0;
+    }
+    
+    // Initialize all elements to nil
+    for (int i = 0; i < size; i++) {
+        elements[i] = S72_NIL.obj;
+    }
+    
+    // Store elements pointer as raw oop
+    array->elements = (oop)elements;
+    
+    return array_obj;
 }
 
-// Array creation
+// Array creation and testing
 S72Value s72_array_new(int size) {
-    if (size < 0) {
-        s72_error("Array size cannot be negative");
-        return S72_NIL;
-    }
-
-    printf("DEBUG: s72_array_new - size=%d\n", size);
-    
-    // Allocate array object
-    oop array_oop = S72_ALLOC(s72_array_vtable, sizeof(S72Array));
-    if (!array_oop) {
-        s72_error("Failed to allocate array");
+    oop array_obj = s72_array_new_libid(size);
+    if (!array_obj) {
         return S72_NIL;
     }
     
-    S72Array *array = (S72Array *)array_oop;
-    
-    // Initialize array structure
-    array->size = size;
-    array->capacity = size;
-    
-    if (size > 0) {
-        array->elements = malloc(size * sizeof(S72Value));
-        if (!array->elements) {
-            s72_error("Failed to allocate array elements");
-            return S72_NIL;
-        }
-        
-        // Initialize all elements to nil
-        for (int i = 0; i < size; i++) {
-            array->elements[i] = S72_NIL;
-        }
-    } else {
-        array->elements = NULL;
-    }
-    
-    printf("DEBUG: Created array at %p with size %d\n", array_oop, size);
-    
-    S72Value result = {array_oop};
+    S72Value result = {array_obj};
     return result;
 }
 
-// Array creation with initial values
-S72Value s72_array_new_with_values(int size, S72Value *values) {
-    S72Value array = s72_array_new(size);
-    if (s72_is_nil(array) || !values) {
-        return array;
+S72Value s72_array_new_with_values(S72Value *values, int count) {
+    S72Value array_val = s72_array_new(count);
+    if (s72_is_nil(array_val)) {
+        return S72_NIL;
     }
     
-    S72Array *arr = (S72Array *)array.obj;
-    for (int i = 0; i < size; i++) {
-        arr->elements[i] = values[i];
+    for (int i = 0; i < count; i++) {
+        s72_array_set(array_val, i, values[i]);
     }
     
-    return array;
+    return array_val;
 }
 
-// Array type checking
 bool s72_is_array(S72Value val) {
     if (s72_is_nil(val)) return false;
-
+    
     // Check if object has the array vtable
     if (!val.obj) return false;
-
-    // Get the vtable from the libid object (libid stores vtable at position -1)
+    
+    // Get the vtable from the libid object
     oop *vtable_ptr = (oop *)val.obj;
     oop obj_vtable = vtable_ptr[-1];
-
-    // Compare with array vtable - s72_array_vtable is a prototype, so get its actual vtable
+    
+    // Compare with array vtable
     oop expected_vtable = s72_array_vtable->_vtable[-1];
-
-    if (obj_vtable == expected_vtable) {
-        return true;
-    }
-
-    return false;
+    return (obj_vtable == expected_vtable);
 }
 
-// Array access functions
-int s72_array_size(S72Value array) {
-    if (!s72_is_array(array)) {
+int s72_array_size(S72Value val) {
+    if (!s72_is_array(val)) {
         s72_error("Value is not an array");
         return 0;
     }
     
-    S72Array *arr = (S72Array *)array.obj;
-    return arr->size;
+    Array array = (Array)val.obj;
+    S72Value size_val = {array->size};
+    return (int)s72_number_value(size_val);
 }
 
-S72Value s72_array_at(S72Value array, int index) {
-    if (!s72_is_array(array)) {
+S72Value s72_array_get(S72Value array_val, int index) {
+    if (!s72_is_array(array_val)) {
         s72_error("Value is not an array");
         return S72_NIL;
     }
     
-    S72Array *arr = (S72Array *)array.obj;
-    
-    // Check bounds (1-based indexing like Smalltalk)
-    if (index < 1 || index > arr->size) {
-        s72_error("Array index out of bounds");
-        return S72_NIL;
-    }
-    
-    return arr->elements[index - 1]; // Convert to 0-based
-}
-
-void s72_array_at_put(S72Value array, int index, S72Value value) {
-    if (!s72_is_array(array)) {
-        s72_error("Value is not an array");
-        return;
-    }
-    
-    S72Array *arr = (S72Array *)array.obj;
-    
-    // Check bounds (1-based indexing like Smalltalk)
-    if (index < 1 || index > arr->size) {
-        s72_error("Array index out of bounds");
-        return;
-    }
-    
-    arr->elements[index - 1] = value; // Convert to 0-based
-}
-
-// Array iteration
-void s72_array_each(S72Value array, S72Value block) {
-    if (!s72_is_array(array)) {
-        s72_error("Value is not an array");
-        return;
-    }
-    
-    if (!s72_is_block(block)) {
-        s72_error("each: requires a block argument");
-        return;
-    }
-    
-    S72Array *arr = (S72Array *)array.obj;
-    
-    for (int i = 0; i < arr->size; i++) {
-        S72Value args[1] = {arr->elements[i]};
-        s72_block_execute(block, 1, args);
-    }
-}
-
-// Array method implementations
-
-// size - return the size of the array
-oop s72_array_size_method(oop closure, oop state, oop receiver) {
-    printf("DEBUG: s72_array_size_method called - receiver=%p\n", receiver);
-    
-    S72Value array_val = {receiver};
+    Array array = (Array)array_val.obj;
     int size = s72_array_size(array_val);
     
-    S72Value size_val = s72_number_new((double)size);
-    return size_val.obj;
+    if (index < 0 || index >= size) {
+        s72_error("Array index out of bounds");
+        return S72_NIL;
+    }
+    
+    oop *elements = (oop*)array->elements;
+    S72Value result = {elements[index]};
+    return result;
 }
 
-// at: - get element at index
-oop s72_array_at_method(oop closure, oop state, oop receiver, oop index) {
-    printf("DEBUG: s72_array_at_method called - receiver=%p, index=%p\n", receiver, index);
+void s72_array_set(S72Value array_val, int index, S72Value value) {
+    if (!s72_is_array(array_val)) {
+        s72_error("Value is not an array");
+        return;
+    }
     
-    S72Value array_val = {receiver};
-    S72Value index_val = {index};
+    Array array = (Array)array_val.obj;
+    int size = s72_array_size(array_val);
     
-    // Convert index to integer
+    if (index < 0 || index >= size) {
+        s72_error("Array index out of bounds");
+        return;
+    }
+    
+    oop *elements = (oop*)array->elements;
+    elements[index] = value.obj;
+}
+
+// ============================================================================
+// Array Methods (Pure libid implementations)
+// ============================================================================
+
+oop s72_array_at_(oop closure, oop state, oop self, ...) {
+    (void)closure; (void)state;
+    
+    va_list args;
+    va_start(args, self);
+    oop index_obj = va_arg(args, oop);
+    va_end(args);
+    
+    if (!index_obj) {
+        s72_error("at: requires one argument");
+        return S72_NIL.obj;
+    }
+    
+    S72Value index_val = {index_obj};
     if (!s72_is_number(index_val)) {
         s72_error("Array index must be a number");
         return S72_NIL.obj;
     }
     
-    int idx = (int)s72_number_value(index_val);
-    S72Value result = s72_array_at(array_val, idx);
+    int index = (int)s72_number_value(index_val) - 1; // Smalltalk uses 1-based indexing
+    
+    S72Value self_val = {self};
+    S72Value result = s72_array_get(self_val, index);
     
     return result.obj;
 }
 
-// at:put: - set element at index
-oop s72_array_at_put_method(oop closure, oop state, oop receiver, oop index, oop value) {
-    printf("DEBUG: s72_array_at_put_method called - receiver=%p, index=%p, value=%p\n", 
-           receiver, index, value);
+oop s72_array_at_put_(oop closure, oop state, oop self, ...) {
+    (void)closure; (void)state;
     
-    S72Value array_val = {receiver};
-    S72Value index_val = {index};
-    S72Value value_val = {value};
+    va_list args;
+    va_start(args, self);
+    oop index_obj = va_arg(args, oop);
+    oop value_obj = va_arg(args, oop);
+    va_end(args);
     
-    // Convert index to integer
-    if (!s72_is_number(index_val)) {
-        s72_error("Array index must be a number");
-        return receiver; // Return self
+    if (!index_obj || !value_obj) {
+        s72_error("at:put: requires two arguments");
+        return S72_NIL.obj;
     }
     
-    int idx = (int)s72_number_value(index_val);
-    s72_array_at_put(array_val, idx, value_val);
+    S72Value index_val = {index_obj};
+    if (!s72_is_number(index_val)) {
+        s72_error("Array index must be a number");
+        return S72_NIL.obj;
+    }
     
-    return receiver; // Return self
+    int index = (int)s72_number_value(index_val) - 1; // Smalltalk uses 1-based indexing
+    
+    S72Value self_val = {self};
+    S72Value value_val = {value_obj};
+    
+    s72_array_set(self_val, index, value_val);
+    
+    return value_obj; // Return the value that was set
 }
 
-// each: - iterate over array elements with a block
-oop s72_array_each_method(oop closure, oop state, oop receiver, oop block) {
-    printf("DEBUG: s72_array_each_method called - receiver=%p, block=%p\n", receiver, block);
+oop s72_array_size_method(oop closure, oop state, oop self) {
+    (void)closure; (void)state;
     
-    S72Value array_val = {receiver};
-    S72Value block_val = {block};
+    Array array = (Array)self;
+    return array->size; // Return the Number object directly
+}
+
+oop s72_array_print(oop closure, oop state, oop self) {
+    (void)closure; (void)state;
     
-    s72_array_each(array_val, block_val);
+    S72Value self_val = {self};
+    int size = s72_array_size(self_val);
     
-    return receiver; // Return self
+    printf("#(");
+    for (int i = 0; i < size; i++) {
+        if (i > 0) printf(" ");
+        
+        S72Value element = s72_array_get(self_val, i);
+        
+        // Simple printing - could be enhanced to call print method on elements
+        if (s72_is_nil(element)) {
+            printf("nil");
+        } else if (s72_is_number(element)) {
+            printf("%.0f", s72_number_value(element));
+        } else {
+            printf("<object>");
+        }
+    }
+    printf(")");
+    
+    return self;
+}
+
+// ============================================================================
+// Initialization
+// ============================================================================
+
+void s72_array_init(void) {
+    // Vtable should already be created in main.c
+    if (!s72_array_vtable) {
+        fprintf(stderr, "Error: Array vtable not initialized\n");
+        return;
+    }
+    
+    // Install array methods
+    oop sel_at = S72_INTERN("at:");
+    oop sel_at_put = S72_INTERN("at:put:");
+    oop sel_size = S72_INTERN("size");
+    oop sel_print = S72_INTERN("print");
+    
+    S72_METHOD(s72_array_vtable, sel_at, s72_array_at_);
+    S72_METHOD(s72_array_vtable, sel_at_put, s72_array_at_put_);
+    S72_METHOD(s72_array_vtable, sel_size, s72_array_size_method);
+    S72_METHOD(s72_array_vtable, sel_print, s72_array_print);
+    
+    // Pure libid array system initialized successfully
 }

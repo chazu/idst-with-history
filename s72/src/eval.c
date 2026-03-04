@@ -219,7 +219,7 @@ S72Value s72_eval_list(ASTNode *node, S72Env *env) {
             // Store the global variable using the environment system
             s72_def_global(var_name, value);
 
-            return value;  // Return the value that was defined
+            return S72_NIL;  // def should return nil like most Lisps
         }
         else if (strcmp(func_name, "let") == 0 && node->data.list.count == 3) {
             // let creates a local variable in the current environment
@@ -236,7 +236,7 @@ S72Value s72_eval_list(ASTNode *node, S72Env *env) {
             s72_env_bind(env, var_name, value);
             printf("DEBUG: let bound local variable '%s' to %p\n", var_name, value.obj);
 
-            return value;  // Return the value that was bound
+            return S72_NIL;  // let should return nil like most Lisps
         }
         else if (strcmp(func_name, "set") == 0 && node->data.list.count == 3) {
             // set modifies an existing variable (searches environment chain)
@@ -252,12 +252,12 @@ S72Value s72_eval_list(ASTNode *node, S72Env *env) {
             // Try to set in environment chain first
             if (s72_env_set(env, var_name, value)) {
                 printf("DEBUG: set updated local variable '%s' to %p\n", var_name, value.obj);
-                return value;
+                return S72_NIL;  // set should return nil like most Lisps
             }
 
             // If not found locally, try global
             if (s72_set_global(var_name, value)) {
-                return value;
+                return S72_NIL;  // set should return nil like most Lisps
             }
 
             // Variable not found anywhere
