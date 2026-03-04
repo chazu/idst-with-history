@@ -1,7 +1,1 @@
-#!/bin/sh
-
-if test -x ../../object/stage2/idc; then
-  ../../object/stage2/idc -B ../../object/stage2/ $*
-else
-  idc $*
-fi
+../../object/stage2/idc

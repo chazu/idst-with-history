@@ -1,0 +1,22 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">	<!-- -*- html -*- -->
+<html>
+<head>
+<title>Coke programming guide</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<meta name="keywords" content="pepsi">
+<meta name="description" content="Coke programming guide">
+</head>
+<body>
+
+<center>
+<h1>Coke programming guide</h1>
+$Id: coke.html.in 545 2006-11-06 18:04:41Z piumarta $
+<br>
+corresponds to <tt>examples/jolt</tt> in the idst-5.4 release
+</center>
+
+<br>
+<br>
+
+<b>Contents:</b><br>
+<blockquote>

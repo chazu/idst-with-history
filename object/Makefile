@@ -28,6 +28,10 @@ stage3/gc.a : boot/gc.a
 	cp -p $< $@
 	-ranlib -t $@
 
+stage3/gc_stubs.o : boot/gc_stubs.o
+	-$(SHELL) -ec '[ -d stage3 ] || mkdir stage3'
+	cp -p $< $@
+
 
 stage2/idc : stage1/idc stage2/idc1
 	cp -p idc/idc $@
@@ -47,6 +51,10 @@ stage2/gc.a : boot/gc.a
 	cp -p $< $@
 	-ranlib -t $@
 
+stage2/gc_stubs.o : boot/gc_stubs.o
+	-$(SHELL) -ec '[ -d stage2 ] || mkdir stage2'
+	cp -p $< $@
+
 
 stage1/idc : stage1/idc1
 	cp -p idc/idc $@
@@ -65,6 +73,10 @@ stage1/gc.a : boot/gc.a
 	-$(SHELL) -ec '[ -d stage1 ] || mkdir stage1 ; mkdir stage1/include ; mkdir stage1/include/gc ; mkdir stage1/include/id '
 	cp -p $< $@
 	-ranlib -t $@
+
+stage1/gc_stubs.o : boot/gc_stubs.o
+	-$(SHELL) -ec '[ -d stage1 ] || mkdir stage1'
+	cp -p $< $@
 
 
 boot/idc : boot/idc1

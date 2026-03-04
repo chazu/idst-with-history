@@ -1,0 +1,36 @@
+---
+triple:          'x86_64-apple-darwin'
+binary-path:     lib1.so
+relocations:
+  - { offset: 0x26, size: 0x8, addend: 0x0, symName: ___id__init__, symObjAddr: 0x0, symBinAddr: 0x910, symSize: 0x4C7 }
+  - { offset: 0x4D, size: 0x8, addend: 0x0, symName: __libid, symObjAddr: 0x23A0, symBinAddr: 0x20A8, symSize: 0x0 }
+  - { offset: 0x6F0, size: 0x8, addend: 0x0, symName: __Selectors, symObjAddr: 0x650, symBinAddr: 0x2030, symSize: 0x0 }
+  - { offset: 0x733, size: 0x8, addend: 0x0, symName: ___info, symObjAddr: 0x690, symBinAddr: 0x2070, symSize: 0x0 }
+  - { offset: 0x748, size: 0x8, addend: 0x0, symName: _s__5fimport_, symObjAddr: 0x23A8, symBinAddr: 0x20B0, symSize: 0x0 }
+  - { offset: 0x75E, size: 0x8, addend: 0x0, symName: _v__object, symObjAddr: 0x23B0, symBinAddr: 0x20B8, symSize: 0x0 }
+  - { offset: 0x774, size: 0x8, addend: 0x0, symName: _v_Object, symObjAddr: 0x23B8, symBinAddr: 0x20C0, symSize: 0x0 }
+  - { offset: 0x78A, size: 0x8, addend: 0x0, symName: _v_UndefinedObject, symObjAddr: 0x23C0, symBinAddr: 0x20C8, symSize: 0x0 }
+  - { offset: 0x7A0, size: 0x8, addend: 0x0, symName: _v_StaticBlockClosure, symObjAddr: 0x23C8, symBinAddr: 0x20D0, symSize: 0x0 }
+  - { offset: 0x7B6, size: 0x8, addend: 0x0, symName: _v_Magnitude, symObjAddr: 0x23D0, symBinAddr: 0x20D8, symSize: 0x0 }
+  - { offset: 0x7CC, size: 0x8, addend: 0x0, symName: _v_Number, symObjAddr: 0x23D8, symBinAddr: 0x20E0, symSize: 0x0 }
+  - { offset: 0x7E2, size: 0x8, addend: 0x0, symName: _v_Integer, symObjAddr: 0x23E0, symBinAddr: 0x20E8, symSize: 0x0 }
+  - { offset: 0x7F8, size: 0x8, addend: 0x0, symName: _v_LargePositiveInteger, symObjAddr: 0x23E8, symBinAddr: 0x20F0, symSize: 0x0 }
+  - { offset: 0x80E, size: 0x8, addend: 0x0, symName: _v_Collection, symObjAddr: 0x23F0, symBinAddr: 0x20F8, symSize: 0x0 }
+  - { offset: 0x824, size: 0x8, addend: 0x0, symName: _v_SequenceableCollection, symObjAddr: 0x23F8, symBinAddr: 0x2100, symSize: 0x0 }
+  - { offset: 0x83A, size: 0x8, addend: 0x0, symName: _v_ArrayedCollection, symObjAddr: 0x2400, symBinAddr: 0x2108, symSize: 0x0 }
+  - { offset: 0x850, size: 0x8, addend: 0x0, symName: _v_Array, symObjAddr: 0x2408, symBinAddr: 0x2110, symSize: 0x0 }
+  - { offset: 0x866, size: 0x8, addend: 0x0, symName: _v_WordArray, symObjAddr: 0x2410, symBinAddr: 0x2118, symSize: 0x0 }
+  - { offset: 0x87C, size: 0x8, addend: 0x0, symName: _v_ByteArray, symObjAddr: 0x2418, symBinAddr: 0x2120, symSize: 0x0 }
+  - { offset: 0x892, size: 0x8, addend: 0x0, symName: _v_String, symObjAddr: 0x2420, symBinAddr: 0x2128, symSize: 0x0 }
+  - { offset: 0x8A8, size: 0x8, addend: 0x0, symName: _v_ImmutableString, symObjAddr: 0x2428, symBinAddr: 0x2130, symSize: 0x0 }
+  - { offset: 0x8BE, size: 0x8, addend: 0x0, symName: _v_LookupKey, symObjAddr: 0x2430, symBinAddr: 0x2138, symSize: 0x0 }
+  - { offset: 0x8D4, size: 0x8, addend: 0x0, symName: _v_Set, symObjAddr: 0x2438, symBinAddr: 0x2140, symSize: 0x0 }
+  - { offset: 0x8EA, size: 0x8, addend: 0x0, symName: _v_Dictionary, symObjAddr: 0x2440, symBinAddr: 0x2148, symSize: 0x0 }
+  - { offset: 0x900, size: 0x8, addend: 0x0, symName: _v_IdentityDictionary, symObjAddr: 0x2448, symBinAddr: 0x2150, symSize: 0x0 }
+  - { offset: 0x916, size: 0x8, addend: 0x0, symName: _v_Stream, symObjAddr: 0x2450, symBinAddr: 0x2158, symSize: 0x0 }
+  - { offset: 0x92C, size: 0x8, addend: 0x0, symName: _v_PositionableStream, symObjAddr: 0x2458, symBinAddr: 0x2160, symSize: 0x0 }
+  - { offset: 0x941, size: 0x8, addend: 0x0, symName: _s_size_5f_value_5f_, symObjAddr: 0x2460, symBinAddr: 0x2168, symSize: 0x0 }
+  - { offset: 0x957, size: 0x8, addend: 0x0, symName: _l_1, symObjAddr: 0x2468, symBinAddr: 0x2170, symSize: 0x0 }
+  - { offset: 0x96C, size: 0x8, addend: 0x0, symName: _s_putln, symObjAddr: 0x2470, symBinAddr: 0x2178, symSize: 0x0 }
+  - { offset: 0x975, size: 0x8, addend: 0x0, symName: ___id__init__, symObjAddr: 0x0, symBinAddr: 0x910, symSize: 0x4C7 }
+...

@@ -126,6 +126,10 @@
 #   define _ASM_NOCOMP
 # endif
 
+#elif defined(__x86_64__)				  /**** x86_64 ****/
+
+# define iflush(first,last)
+
 #elif 1
 
 # define _ASM_NOARCH

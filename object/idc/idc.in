@@ -16,7 +16,7 @@ idmain="false"
 cckill="true"
 dlsyms="false"
 static="false"
-gc_a="gc.a"
+gc_a="gc_stubs.o"
 _p=""
 
 fatal () {

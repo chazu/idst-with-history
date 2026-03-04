@@ -1,7 +1,7 @@
 IDST   = @IDST@
-CFLAGS = @CFLAGS@ @MFLAGS@ -g @O3FLAGS@ -I$(BIN)/include -DNDEBUG -DSYSARCH=\"@SYSARCH@\" -DSYSOS=\"@SYSOS@\" $(EFLAGS) -fno-strict-aliasing
-PFLAGS = @CFLAGS@ @MFLAGS@ -g @PGFLAGS@ -I$(BIN)/include -DNDEBUG -DSYSARCH=\"@SYSARCH@\" -DSYSOS=\"@SYSOS@\" $(EFLAGS) -fno-strict-aliasing
-GFLAGS = @CFLAGS@ @MFLAGS@ -g           -I$(BIN)/include -DNDEBUG -DSYSARCH=\"@SYSARCH@\" -DSYSOS=\"@SYSOS@\" $(EFLAGS) -fno-strict-aliasing
+CFLAGS = @CFLAGS@ @MFLAGS@ -g @O3FLAGS@ -I$(BIN)/include -DNDEBUG -DSYSARCH=\"@SYSARCH@\" -DSYSOS=\"@SYSOS@\" -DNO_GC $(EFLAGS) -fno-strict-aliasing
+PFLAGS = @CFLAGS@ @MFLAGS@ -g @PGFLAGS@ -I$(BIN)/include -DNDEBUG -DSYSARCH=\"@SYSARCH@\" -DSYSOS=\"@SYSOS@\" -DNO_GC $(EFLAGS) -fno-strict-aliasing
+GFLAGS = @CFLAGS@ @MFLAGS@ -g           -I$(BIN)/include -DNDEBUG -DSYSARCH=\"@SYSARCH@\" -DSYSOS=\"@SYSOS@\" -DNO_GC $(EFLAGS) -fno-strict-aliasing
 PREFIX = @PREFIX@
 GCDIR  = @GCDIR@
 

@@ -1,0 +1,11 @@
+<table cellpadding="0px">
+<tr><td><b>1&nbsp;&nbsp;&nbsp;Introduction</b><tr><td>
+<tr><td>1.1&nbsp;&nbsp;&nbsp;Inheritance and delegation</td></tr>
+<tr><td><b>2&nbsp;&nbsp;&nbsp;Implementation</b><tr><td>
+<tr><td>2.1&nbsp;&nbsp;&nbsp;Receiver splitting</td></tr>
+<tr><td>2.2&nbsp;&nbsp;&nbsp;Multi-dimensional dynamic bind</td></tr>
+<tr><td><b>3&nbsp;&nbsp;&nbsp;A short example</b><tr><td>
+<tr><td><b>4&nbsp;&nbsp;&nbsp;Caveats</b><tr><td>
+<tr><td><b>5&nbsp;&nbsp;&nbsp;Applications</b><tr><td>
+<tr><td><b>6&nbsp;&nbsp;&nbsp;Acknowledgements</b><tr><td>
+</table>

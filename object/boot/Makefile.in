@@ -113,10 +113,10 @@ SYSOS		= @SYSOS@
 all : $(FILES)
 
 libid.o : src/libid.c include/gc gc.a
-	$(CC) -Iinclude -DPREFIX='"$(PREFIX)"' $(CFLAGS) $(O3FLAGS) $(CCFLAGS_O) $(LDFLAGS_O) $< $(LDLIBS_O) -o $@
+	$(CC) -Iinclude -DPREFIX='"$(PREFIX)"' $(CFLAGS) -DNO_GC $(O3FLAGS) $(CCFLAGS_O) $(LDFLAGS_O) $< $(LDLIBS_O) -o $@
 
 libid_g.o : src/libid.c include/gc gc.a
-	$(CC) -Iinclude -DPREFIX='"$(PREFIX)"' $(CFLAGS) $(GFLAGS) $(CCFLAGS_O) $(LDFLAGS_O) $< $(LDLIBS_O) -o $@
+	$(CC) -Iinclude -DPREFIX='"$(PREFIX)"' $(CFLAGS) -DNO_GC $(GFLAGS) $(CCFLAGS_O) $(LDFLAGS_O) $< $(LDLIBS_O) -o $@
 
 idc : ../idc/idc gc.a
 	cp -p $< .
@@ -132,27 +132,23 @@ idst$(OBJEXT_SO) : src/idst$(OBJEXT_SO).c $(IDST_FILES) include/gc gc.a
 %$(OBJEXT_O) : src/%$(OBJEXT_O).c include/gc gc.a
 	$(CC) -Iinclude $(CFLAGS) $(OFLAGS) $(CCFLAGS_O) $(LDFLAGS_O) $< $(LDLIBS_O) -o $@
 
-%$(OBJEXT) : src/%.c gc.a libid.o libid_g.o include/gc
-	$(CC) -Iinclude $(CFLAGS) $(OFLAGS) $(CCFLAGS) $(LDFLAGS) $< $(LDLIBS) -o $@ libid.o gc.a -lm
+%$(OBJEXT) : src/%.c gc.a gc_stubs.o libid.o libid_g.o include/gc
+	$(CC) -Iinclude $(CFLAGS) $(OFLAGS) $(CCFLAGS) $(LDFLAGS) $< $(LDLIBS) -o $@ libid.o gc_stubs.o -lm
 
 include/gc :
 	rm -rf include/gc
 	cp -pr ../$(GCDIR)/include include/gc
 
-gc.a : ../$(GCDIR)/.libs/libgc.a
-	-$(SHELL) -ec 'ln -s ../$(GCDIR)/.libs/libgc.a ./gc.a'
+gc_stubs.o : src/gc_stubs.c
+	$(CC) $(MFLAGS) -c $< -o $@
 
-../$(GCDIR)/.libs/libgc.a :
-ifeq ($(SYSOS),win32)
-	-$(SHELL) -ec 'cd ../$(GCDIR)/; $(MAKE) -f Makefile.win32 ABI_FLAG="$(MFLAGS) -DLARGE_CONFIG"'
-else
-	-$(SHELL) -ec 'cd ../$(GCDIR)/; echo $$PATH; test -f Makefile || CFLAGS="$(MFLAGS)" ./configure --enable-large-config --disable-shared; $(MAKE)'
-endif
+gc.a : gc_stubs.o
+	/usr/bin/libtool -static -o $@ $<
 
 install : all .FORCE
 	-rm -rf $(PREFIX)
 	-mkdir -p $(PREFIX)
-	-cp -pr include gc.a libid.o libid_g.o idc idc1 *$(OBJEXT_SO) $(PREFIX)/.
+	-cp -pr include gc.a gc_stubs.o libid.o libid_g.o idc idc1 *$(OBJEXT_SO) $(PREFIX)/.
 	-cp -pr ../st80/*.st $(PREFIX)/.
 	-cp -pr ../idc/*.st $(PREFIX)/.
 	-cp -pr idc /usr/local/bin/.
